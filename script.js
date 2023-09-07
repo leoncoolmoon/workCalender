@@ -6,7 +6,7 @@ var languages = {
         "summary": "Shift type",
         "alarm": "Alarm time",
         "description": "Description",
-        "create": "Create",
+        "create": "OK",
         "cancel": "Cancel",
         "clear": "Clear",
         "save": "Save",
@@ -35,7 +35,7 @@ var languages = {
         "summary": "班次类型",
         "alarm": "闹铃时间",
         "description": "描述",
-        "create": "创建",
+        "create": "确认",
         "cancel": "取消",
         "clear": "清空",
         "save": "保存",
@@ -73,6 +73,7 @@ var landscape = true;
 var oldLandscape = true;
 // 日历div，操作div，操作div的背景遮罩，顶部信息div，中间日历显示div，班次信息编辑用div，班次类型信息编辑用div
 var calendarDiv, operateDiv, operateBoxDiv, topDiv, middleDiv, shiftEditerDiv, shiftTypeEditBoxDiv;
+var shiftTypeListDiv;
 var addShiftTypeDiv, removeShiftTypeDiv, editShiftTypeDiv;
 var selectedDate = null;
 var selectedDateD = null;
@@ -158,6 +159,16 @@ window.onload = function () {
     shiftEditerDiv = document.createElement("div");
     shiftEditerDiv.id = "shiftEditerDiv";//用来编辑当日班次，列出所有班次类型，可以添加班次类型，删除班次类型，编辑班次类型
     shiftEditerDiv.style.position = "fixed";
+    shiftTypeListDiv = document.createElement("div");
+    shiftTypeListDiv.id = "shiftTypeListDiv";//用来列出所有班次类型
+    // shiftTypeListDiv.style.display = "block";
+    // shiftTypeListDiv.style.position = "fixed";
+    // shiftTypeListDiv.style.zIndex = "100";
+    shiftTypeListDiv.style.top = "0px";
+    shiftTypeListDiv.style.left = "0px";
+    shiftTypeListDiv.style.width = "inherit";
+    // shiftTypeListDiv.style.height = "80%";
+    shiftEditerDiv.appendChild(shiftTypeListDiv);
     //addShiftTypeDiv, removeShiftTypeDiv, editShiftTypeDiv;
     if (shiftTypeTable === undefined) {
         shiftEditerDiv.innerHTML = language.none;
@@ -185,7 +196,7 @@ window.onload = function () {
         topDiv.innerHTML = language.addShiftType;
     });
     shiftEditerDiv.appendChild(addShiftTypeDiv);
-    // shiftEditerDiv.style.width = "90%";
+    shiftEditerDiv.style.width = "inherit";
     shiftEditerDiv.style.height = "90%";
     shiftEditerDiv.style.display = " grid";
     shiftEditerDiv.style.fontSize = "5vh";
@@ -400,7 +411,7 @@ function clearForm() {
 }
 function loadShiftType() {
 
-    shiftEditerDiv.innerHTML = "";
+    shiftTypeListDiv.innerHTML = "";
     for (var i = 0; i < shiftTypeTable.length; i++) {
         //用来展示班次类型的div
         var shiftType = document.createElement("div");
@@ -411,13 +422,13 @@ function loadShiftType() {
         shiftType.style.borderRadius = "1vw";
         shiftType.style.margin = "1vw";
         shiftType.style.padding = "1vw";
-        shiftType.style.display = "inline-block";
+        // shiftType.style.display = "inline-block";
         shiftType.style.fontSize = "5vh";
         shiftType.style.textAlign = "center";
         shiftType.style.alignItems = "center";
-        shiftType.style.width = "20vw";
-        shiftType.style.height = "10vh";
-        shiftType.style.lineHeight = "10vh";
+        // shiftType.style.width = "inherit";
+        // shiftType.style.height = "10vh";
+        // shiftType.style.lineHeight = "10vh";
         shiftType.style.verticalAlign = "middle";
         shiftType.style.cursor = "pointer";
         shiftType.style.textShadow = "gray 0.2em 0.1em 0.2em";
@@ -440,12 +451,8 @@ function loadShiftType() {
         editShiftTypeDiv.style.margin = "1vw";
         editShiftTypeDiv.style.padding = "1vw";
         editShiftTypeDiv.style.display = "inline-block";
-        editShiftTypeDiv.style.fontSize = "5vh";
         editShiftTypeDiv.style.textAlign = "center";
         editShiftTypeDiv.style.alignItems = "center";
-        editShiftTypeDiv.style.width = "20vw";
-        editShiftTypeDiv.style.height = "10vh";
-        editShiftTypeDiv.style.lineHeight = "10vh";
         editShiftTypeDiv.style.verticalAlign = "middle";
         editShiftTypeDiv.style.cursor = "pointer";
         editShiftTypeDiv.id = "editShiftTypeDiv";
@@ -466,7 +473,7 @@ function loadShiftType() {
             loadShiftType();
         });
         shiftType.appendChild(removeShiftTypeDiv);
-        shiftEditerDiv.appendChild(shiftType);
+        shiftTypeListDiv.appendChild(shiftType);
     }
 }
 function checkLandscape() {
@@ -591,8 +598,10 @@ function generateMonth(year, month, container) {
             } else if (date > daysInMonth) {
                 break;
             } else {
-                var n = shifts.find(shift => shift.date ===  Date(year, month, date));
-                cell.style.backgroundColor = n != null ? shiftTypeTable.find(type => type === n.type).color : "white";
+                var d = new Date(year, month, date).toISOString().substring(0, 10);
+                var n = shifts.find(shift => shift.date.toISOString().substring(0, 10) === d);
+                var s = n != undefined ? shiftTypeTable.find(shift => shift.summary == n.type):undefined;
+                cell.style.backgroundColor = s != undefined ? s.color : "white";
                 cell.innerHTML = date;
                 if (j === 5 || j === 6) {
                     cell.classList.add("weekend");
@@ -630,13 +639,14 @@ function editShiftTpye(shiftType) {//编辑班次类型
         alert(language.shiftNotFound);
         return;
     } else {
-        document.getElementById("start").value = shiftTypeTable[i].start;
-        document.getElementById("end").value = shiftTypeTable[i].end;
-        document.getElementById("summary").value = shiftTypeTable[i].summary;
-        document.getElementById("alarm").value = shiftTypeTable[i].trigger;
-        document.getElementById("contentForAlarm").value = shiftTypeTable[i].description;
-        audiodocument.getElementById("alarmFile").value = shiftTypeTable[i].audioFile;
-        document.getElementById("color").value = shiftTypeTable[i].color;
+        document.getElementById("start").value = i.start;
+        document.getElementById("end").value = i.end;
+        document.getElementById("summary").value = i.summary;
+        document.getElementById("alarm").value = i.trigger;
+        document.getElementById("contentForAlarm").value = i.description;
+        document.getElementById("alarmFile").value = i.audioFile;
+        document.getElementById("alarmFile").innerHTML = getName(i.audioFile);
+        document.getElementById("color").value = i.color;
     }
 }
 
