@@ -59,10 +59,6 @@ var languages = {
     }
 };
 
-// var weekNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-// var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-//"selectAbleTimes": "5 minutes before|10 minutes before|15 minutes before|20 minutes before|30 minutes before|45 minutes before|1 hour before|1.5 hours before|2 hours before|"
-// selectAbleTimesValue =["-PT5M" ，"-PT10M"...]
 var selectAbleTimesValue = ["-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
 
 var shifts = [];//班表
@@ -79,6 +75,7 @@ var oldLandscape = true;
 var calendarDiv, operateDiv, operateBoxDiv, topDiv, middleDiv, shiftEditerDiv, shiftTypeEditBoxDiv;
 var addShiftTypeDiv, removeShiftTypeDiv, editShiftTypeDiv;
 var selectedDate = null;
+var selectedDateD = null;
 window.onresize = function () {
     checkLandscape();
     if (oldLandscape != landscape) {
@@ -142,11 +139,12 @@ window.onload = function () {
     operateDiv.style.left = "0px";
     operateDiv.style.width = "70vw";
     operateDiv.style.height = "70vh";
-    operateDiv.style.transformOrigin = "center";
+    operateDiv.style.padding = "3vw";
+    // operateDiv.style.transformOrigin = "center";
     //   border-radius: 1vw;box-shadow: rgb(0 0 0 / 75%) 2vw 2vh 2vh;
     operateDiv.style.borderRadius = "1vw";
     operateDiv.style.boxShadow = "rgb(0 0 0 / 75%) 2vw 2vh 2vh";
-    operateDiv.style.transform = "translate(15%, 15%)";
+    operateDiv.style.transform = "translate(17.5%, 17.5%)";
     operateBoxDiv.appendChild(operateDiv);
     operateBoxDiv.addEventListener("click", function (event) {
         if (event.target.id == "operateBoxDiv") {
@@ -164,69 +162,7 @@ window.onload = function () {
     if (shiftTypeTable === undefined) {
         shiftEditerDiv.innerHTML = language.none;
     } else {
-        shiftEditerDiv.innerHTML = "";
-        for (var i = 0; i < shiftTypeTable.length; i++) {
-            //用来展示班次类型的div
-            var shiftType = document.createElement("div");
-            shiftType.id = shiftTypeTable[i].summary;
-            shiftType.innerHTML = shiftTypeTable[i].summary;
-            shiftType.style.backgroundColor = shiftTypeTable[i].color;
-            shiftType.style.color = "white";
-            shiftType.style.borderRadius = "1vw";
-            shiftType.style.margin = "1vw";
-            shiftType.style.padding = "1vw";
-            shiftType.style.display = "inline-block";
-            shiftType.style.fontSize = "5vh";
-            shiftType.style.textAlign = "center";
-            shiftType.style.alignItems = "center";
-            shiftType.style.width = "20vw";
-            shiftType.style.height = "10vh";
-            shiftType.style.lineHeight = "10vh";
-            shiftType.style.verticalAlign = "middle";
-            shiftType.style.cursor = "pointer";
-            shiftType.style.textShadow = "gray 0.2em 0.1em 0.2em";
-
-            shiftType.addEventListener("click", function (event) {
-                if (event.target.id == this.id) {
-                    //赋予当前选择日期当前的班次类型
-                    //TODO:赋予当前选择日期当前的班次类型
-                }
-            });
-            //编辑当前的班次类型,或者删除当前的班次类型 按钮构造
-            editShiftTypeDiv = document.createElement("div");
-            editShiftTypeDiv.style.backgroundColor = "gray";
-            editShiftTypeDiv.style.color = "white";
-            editShiftTypeDiv.style.borderRadius = "1vw";
-            editShiftTypeDiv.style.margin = "1vw";
-            editShiftTypeDiv.style.padding = "1vw";
-            editShiftTypeDiv.style.display = "inline-block";
-            editShiftTypeDiv.style.fontSize = "5vh";
-            editShiftTypeDiv.style.textAlign = "center";
-            editShiftTypeDiv.style.alignItems = "center";
-            editShiftTypeDiv.style.width = "20vw";
-            editShiftTypeDiv.style.height = "10vh";
-            editShiftTypeDiv.style.lineHeight = "10vh";
-            editShiftTypeDiv.style.verticalAlign = "middle";
-            editShiftTypeDiv.style.cursor = "pointer";
-            editShiftTypeDiv.id = "editShiftTypeDiv";
-            removeShiftTypeDiv = editShiftTypeDiv.cloneNode(true);
-            //编辑当前的班次类型
-            editShiftTypeDiv.innerHTML = language.edit;
-            editShiftTypeDiv.addEventListener("click", function (event) {
-                editShiftTpye(shiftType.id);
-                shiftTypeEditBoxDiv.style.display = "block";
-                topDiv.innerHTML = language.editShiftType;
-            });
-            shiftType.appendChild(editShiftTypeDiv);
-            //删除当前的班次类型
-            removeShiftTypeDiv.id = "removeShiftTypeDiv";
-            removeShiftTypeDiv.innerHTML = language.remove;
-            removeShiftTypeDiv.addEventListener("click", function (event) {
-                removeShiftType(shiftType.id);
-            });
-            shiftType.appendChild(removeShiftTypeDiv);
-            shiftEditerDiv.appendChild(shiftType);
-        }
+        loadShiftType();
     }
     //添加班次类型按钮构造
     addShiftTypeDiv = document.createElement("div");
@@ -238,12 +174,9 @@ window.onload = function () {
     addShiftTypeDiv.style.margin = "1vw";
     addShiftTypeDiv.style.padding = "1vw";
     addShiftTypeDiv.style.display = "inline-block";
-    addShiftTypeDiv.style.fontSize = "5vh";
     addShiftTypeDiv.style.textAlign = "center";
     addShiftTypeDiv.style.alignItems = "center";
-    addShiftTypeDiv.style.width = "80%";
-    addShiftTypeDiv.style.height = "10vh";
-    addShiftTypeDiv.style.lineHeight = "10vh";
+    // addShiftTypeDiv.style.width = "80%";
     addShiftTypeDiv.style.verticalAlign = "middle";
     addShiftTypeDiv.style.cursor = "pointer";
     addShiftTypeDiv.addEventListener("click", function (event) {
@@ -252,9 +185,8 @@ window.onload = function () {
         topDiv.innerHTML = language.addShiftType;
     });
     shiftEditerDiv.appendChild(addShiftTypeDiv);
-
-    shiftEditerDiv.style.width = "100%";
-    shiftEditerDiv.style.height = "100%";
+    // shiftEditerDiv.style.width = "90%";
+    shiftEditerDiv.style.height = "90%";
     shiftEditerDiv.style.display = " grid";
     shiftEditerDiv.style.fontSize = "5vh";
     shiftEditerDiv.style.textAlign = "center";
@@ -268,14 +200,14 @@ window.onload = function () {
     shiftTypeEditBoxDiv.style.display = "none";
     shiftTypeEditBoxDiv.style.position = "fixed";
     shiftTypeEditBoxDiv.style.zIndex = "120";
-    shiftTypeEditBoxDiv.style.width = "100%";
-    shiftTypeEditBoxDiv.style.height = "100%";
+    shiftTypeEditBoxDiv.style.width = "90%";
+    shiftTypeEditBoxDiv.style.height = "90%";
     shiftTypeEditBoxDiv.style.fontSize = "5vh";
     shiftTypeEditBoxDiv.style.textAlign = "center";
     shiftTypeEditBoxDiv.style.alignItems = "center";
     shiftTypeEditBoxDiv.style.backgroundColor = "white";
     //插入一个div容纳start, end, summary, created, alarm,contentForAlarm,alarmFile,color
-    
+
     var contentDiv = document.createElement("div");
     contentDiv.id = "contentDiv";
     contentDiv.style.width = "100%";
@@ -287,60 +219,60 @@ window.onload = function () {
     shiftTypeEditBoxDiv.appendChild(contentDiv);
 
     var startContainer = document.createElement("div");
-    startContainer.className="row"
+    startContainer.className = "row"
     //在start前增加一个language.start的标签
     var startLabel = document.createElement("div");
-    startLabel.className="label"
+    startLabel.className = "label"
     startLabel.innerHTML = language.start;
     startContainer.appendChild(startLabel);
     //start 是一个时间选择器value 类似“08:00”
     var start = document.createElement("input");
-    start.className="content";
+    start.className = "content";
     start.type = "time";
     start.id = "start";
     startContainer.appendChild(start);
     contentDiv.appendChild(startContainer);
 
     var endContainer = document.createElement("div");
-    endContainer.className="row"
+    endContainer.className = "row"
     //在end前增加一个language.end的标签
     var endLabel = document.createElement("div");
-    endLabel.className="label"
+    endLabel.className = "label"
     endLabel.innerHTML = language.end;
     endContainer.appendChild(endLabel);
     //end 是一个时间选择器value 类似“17:00”
     var end = document.createElement("input");
-    end.className="content";
+    end.className = "content";
     end.type = "time";
     end.id = "end";
     endContainer.appendChild(end);
     contentDiv.appendChild(endContainer);
 
     var summaryContainer = document.createElement("div");
-    summaryContainer.className="row"
+    summaryContainer.className = "row"
     //在summary前增加一个language.summary的标签
     var summaryLabel = document.createElement("div");
-    summaryLabel.className="label"
+    summaryLabel.className = "label"
     summaryLabel.innerHTML = language.summary;
     summaryContainer.appendChild(summaryLabel);
     //summary 是一个文本输入框value 类似“早班”
     var summary = document.createElement("input");
-    summary.className="content";
+    summary.className = "content";
     summary.type = "text";
     summary.id = "summary";
     summaryContainer.appendChild(summary);
     contentDiv.appendChild(summaryContainer);
 
     var alarmContainer = document.createElement("div");
-    alarmContainer.className="row"
+    alarmContainer.className = "row"
     //在alarm前增加一个language.alarm的标签
     var alarmLabel = document.createElement("div");
-    alarmLabel.className="label"
+    alarmLabel.className = "label"
     alarmLabel.innerHTML = language.alarm;
     alarmContainer.appendChild(alarmLabel);
     //alarm 是一个选择器 显示可供选择的内容 为language.selectAbleTimes。value为相应类似“-PT5M ，-PT10M ... ”
     var alarm = document.createElement("select");
-    alarm.className="content";
+    alarm.className = "content";
     alarm.id = "alarm";
     language.selectAbleTimes.forEach((time, i) => {
         const option = document.createElement("option");
@@ -352,37 +284,31 @@ window.onload = function () {
     contentDiv.appendChild(alarmContainer);
 
     var contentForAlarmContainer = document.createElement("div");
-    contentForAlarmContainer.className="row"
+    contentForAlarmContainer.className = "row"
     //在contentForAlarm前增加一个language.description的标签
     var contentForAlarmLabel = document.createElement("div");
-    contentForAlarmLabel.className="label"
+    contentForAlarmLabel.className = "label"
     contentForAlarmLabel.innerHTML = language.description;
     contentForAlarmContainer.appendChild(contentForAlarmLabel);
     //contentForAlarm 是一个文本输入框value 类似“早班提醒”
     var contentForAlarm = document.createElement("input");
-    contentForAlarm.className="content";
+    contentForAlarm.className = "content";
     contentForAlarm.type = "text";
     contentForAlarm.id = "contentForAlarm";
     contentForAlarmContainer.appendChild(contentForAlarm);
     contentDiv.appendChild(contentForAlarmContainer);
 
     var alarmFileContainer = document.createElement("div");
-    alarmFileContainer.className="row"
+    alarmFileContainer.className = "row"
     //在alarmFile前增加一个language.alarmAudio的标签
     var alarmAudioLabel = document.createElement("div");
-    alarmAudioLabel.className="label"
+    alarmAudioLabel.className = "label"
     alarmAudioLabel.innerHTML = language.alarmAudio;
     alarmFileContainer.appendChild(alarmAudioLabel);
-    //alarmFile 是一个文本输入框value 类似“/sdcard/notifications/notification.mp3”
-    var alarmFile = document.createElement("input");
-    alarmFile.className="content";
-    alarmFile.type = "text";
-    alarmFile.id = "alarmFile";
-    alarmFileContainer.appendChild(alarmFile);
     //alarmSelector 是一个按钮，点击后弹出系统打开文件对话框，选择一个音频文件，返回文件名到alarmFile
     var alarmSelector = document.createElement("button");
-    alarmSelector.className="content";
-    alarmSelector.id = "alarmSelector";
+    alarmSelector.className = "content";
+    alarmSelector.id = "alarmFile";
     alarmSelector.innerHTML = language.openFile;
     alarmSelector.addEventListener("click", function (event) {
         selectFile();
@@ -391,26 +317,22 @@ window.onload = function () {
     contentDiv.appendChild(alarmFileContainer);
 
     var colorContainer = document.createElement("div");
-    colorContainer.className="row"
+    colorContainer.className = "row"
+    //在color前增加一个language.selectShiftColor的标签
+    var colorLabel = document.createElement("div");
+    colorLabel.className = "label"
+    colorLabel.innerHTML = language.selectShiftColor;
+    colorContainer.appendChild(colorLabel);
     //color 是一个文本框value 类似“#FF0000”，其背景色为该颜色，其文本为白色+阴影
     var color = document.createElement("input");
-    color.className="label";
+    color.className = "content";
     color.value = "#FF0000";
-    color.style.backgroundColor = "#FF0000";
+    // color.style.backgroundColor = "#FF0000";
     color.style.color = "white";
     color.style.textShadow = "gray 0.2em 0.1em 0.2em";
     color.type = "color";
     color.id = "color";
     colorContainer.appendChild(color);
-    //colorSelector 是一个按钮，点击后弹出系统颜色选择器，选择一个颜色，返回颜色值到color
-    var colorSelector = document.createElement("button");
-    colorSelector.className="content";
-    colorSelector.id = "colorSelector";
-    colorSelector.innerHTML = language.selectShiftColor;
-    colorSelector.addEventListener("click", function (event) {
-        color.click();
-    });
-    colorContainer.appendChild(colorSelector);
     contentDiv.appendChild(colorContainer);
 
     //插入一个底部div来容纳clear，cancel，save按钮
@@ -427,8 +349,10 @@ window.onload = function () {
     clear.id = "clear";
     clear.innerHTML = language.clear;
     clear.addEventListener("click", clearForm);
+    clear.style.width = "20%";
+    clear.style.height = "70%";
     bottomDiv.appendChild(clear);
-       
+
     //cancel 是一个按钮，点击后清空所有输入框，并更改shiftTypeEditBoxDiv.style.display = "none";
     var cancel = document.createElement("button");
     cancel.id = "cancel";
@@ -437,6 +361,9 @@ window.onload = function () {
         clearForm();
         shiftTypeEditBoxDiv.style.display = "none";
     });
+    cancel.style.width = "20%";
+    cancel.style.height = "70%";
+    bottomDiv.appendChild(cancel);
     //save 是一个按钮，点击后调用函数addShiftType()，并更改shiftTypeEditBoxDiv.style.display = "none";
     var save = document.createElement("button");
     save.id = "save";
@@ -445,8 +372,11 @@ window.onload = function () {
         addShiftType();
         clearForm();
         shiftTypeEditBoxDiv.style.display = "none";
+        loadShiftType();
     });
-
+    save.style.width = "20%";
+    save.style.height = "70%";
+    bottomDiv.appendChild(save);
     operateDiv.appendChild(shiftTypeEditBoxDiv);
 
 
@@ -458,15 +388,86 @@ window.onload = function () {
     }
     generateCalendar(0);
 }
-function clearForm(){
+function clearForm() {
     document.getElementById("start").value = "";
     document.getElementById("end").value = "";
     document.getElementById("summary").value = "";
     document.getElementById("alarm").value = "";
     document.getElementById("contentForAlarm").value = "";
     document.getElementById("alarmFile").value = "";
-    document.getElementById("color").value = "";
+    document.getElementById("alarmFile").innerHTML = "";
+    document.getElementById("color").value = "#ff0000";
+}
+function loadShiftType() {
 
+    shiftEditerDiv.innerHTML = "";
+    for (var i = 0; i < shiftTypeTable.length; i++) {
+        //用来展示班次类型的div
+        var shiftType = document.createElement("div");
+        shiftType.id = shiftTypeTable[i].summary;
+        shiftType.innerHTML = shiftTypeTable[i].summary;
+        shiftType.style.backgroundColor = shiftTypeTable[i].color;
+        shiftType.style.color = "white";
+        shiftType.style.borderRadius = "1vw";
+        shiftType.style.margin = "1vw";
+        shiftType.style.padding = "1vw";
+        shiftType.style.display = "inline-block";
+        shiftType.style.fontSize = "5vh";
+        shiftType.style.textAlign = "center";
+        shiftType.style.alignItems = "center";
+        shiftType.style.width = "20vw";
+        shiftType.style.height = "10vh";
+        shiftType.style.lineHeight = "10vh";
+        shiftType.style.verticalAlign = "middle";
+        shiftType.style.cursor = "pointer";
+        shiftType.style.textShadow = "gray 0.2em 0.1em 0.2em";
+
+        shiftType.addEventListener("click", function (event) {
+            if (event.target.id == this.id) {
+                //赋予当前选择日期当前的班次类型
+                //TODO:赋予当前选择日期当前的班次类型
+                shifts.push({ date: selectedDateD, type: this.id });
+                selectedDate.style.backgroundColor = this.style.backgroundColor;
+                selectedDate.style.border = "";
+                operateBoxDiv.style.display = "none";
+            }
+        });
+        //编辑当前的班次类型,或者删除当前的班次类型 按钮构造
+        editShiftTypeDiv = document.createElement("div");
+        editShiftTypeDiv.style.backgroundColor = "gray";
+        editShiftTypeDiv.style.color = "white";
+        editShiftTypeDiv.style.borderRadius = "1vw";
+        editShiftTypeDiv.style.margin = "1vw";
+        editShiftTypeDiv.style.padding = "1vw";
+        editShiftTypeDiv.style.display = "inline-block";
+        editShiftTypeDiv.style.fontSize = "5vh";
+        editShiftTypeDiv.style.textAlign = "center";
+        editShiftTypeDiv.style.alignItems = "center";
+        editShiftTypeDiv.style.width = "20vw";
+        editShiftTypeDiv.style.height = "10vh";
+        editShiftTypeDiv.style.lineHeight = "10vh";
+        editShiftTypeDiv.style.verticalAlign = "middle";
+        editShiftTypeDiv.style.cursor = "pointer";
+        editShiftTypeDiv.id = "editShiftTypeDiv";
+        removeShiftTypeDiv = editShiftTypeDiv.cloneNode(true);
+        //编辑当前的班次类型
+        editShiftTypeDiv.innerHTML = language.edit;
+        editShiftTypeDiv.addEventListener("click", function (event) {
+            editShiftTpye(shiftType.id);
+            shiftTypeEditBoxDiv.style.display = "block";
+            topDiv.innerHTML = language.editShiftType;
+        });
+        shiftType.appendChild(editShiftTypeDiv);
+        //删除当前的班次类型
+        removeShiftTypeDiv.id = "removeShiftTypeDiv";
+        removeShiftTypeDiv.innerHTML = language.remove;
+        removeShiftTypeDiv.addEventListener("click", function (event) {
+            removeShiftType(shiftType.id);
+            loadShiftType();
+        });
+        shiftType.appendChild(removeShiftTypeDiv);
+        shiftEditerDiv.appendChild(shiftType);
+    }
 }
 function checkLandscape() {
     oldLandscape = landscape;
@@ -479,7 +480,7 @@ function checkLandscape() {
 function adjustUI() {
 
     //移动div到中间
-    operateDiv.style.transform = "translate(-50%,-50%)";
+    // operateDiv.style.transform = "translate(-50%,-50%)";
 
     if (landscape) {
 
@@ -577,6 +578,7 @@ function generateMonth(year, month, container) {
                     selectedDate = event.target;
                     selectedDate.style.border = "0.2vw solid black";
                     topDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
+                    selectedDateD = new Date(year, month, parseInt(selectedDate.innerHTML));
                 });
                 cell.style.height = monthModeHeight;
                 cell.style.fontSize = "3em";
@@ -589,6 +591,8 @@ function generateMonth(year, month, container) {
             } else if (date > daysInMonth) {
                 break;
             } else {
+                var n = shifts.find(shift => shift.date ===  Date(year, month, date));
+                cell.style.backgroundColor = n != null ? shiftTypeTable.find(type => type === n.type).color : "white";
                 cell.innerHTML = date;
                 if (j === 5 || j === 6) {
                     cell.classList.add("weekend");
@@ -651,7 +655,7 @@ function removeShiftType(shiftType) {//删除shift类型
     }
     var i = findShiftType(shiftType);
     if (i == null) {
-        alert(language.shiftNotFound);
+        //alert(language.shiftNotFound);
         return;
     }
     shiftTypeTable.splice(i, 1);
@@ -664,20 +668,12 @@ function addShiftType() {//添加shift类型
     shiftTpye.summary = document.getElementById("summary").value;//shift类型：从am，pm，night，dayoff，vacation，sick，holiday中选择或者自己输入
     shiftTpye.trigger = document.getElementById("alarm").value;//shift类型所对应的提醒时间
     shiftTpye.description = document.getElementById("contentForAlarm").value;//shift类型所对应的提醒内容
-    shiftTpye.audioFile = audiodocument.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
+    shiftTpye.audioFile = document.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
     shiftTpye.color = document.getElementById("color").value;//shift类型所对应的颜色
     //移除重复的shift类型
     removeShiftType(shiftTpye.summary);
     //添加shift类型    
     shiftTypeTable.push(shiftTpye);
-    //清空输入框    
-    document.getElementById("start").value = "";
-    document.getElementById("end").value = "";
-    document.getElementById("summary").value = "";
-    document.getElementById("alarm").value = "";
-    document.getElementById("contentForAlarm").value = "";
-    audiodocument.getElementById("alarmFile").value = "";
-    document.getElementById("color").value = white;
 }
 //班次类型操作 编辑，查找，删除，添加
 
@@ -690,11 +686,17 @@ function selectFile() {//打开 打开文件对话框来从本地选择一个文
     //fileInput.accept = plainTextFile;//+ "," + STL;
     fileInput.onchange = function (event) {
         audioFile = event.target.files[0];
-        document.getElementById("alarmFile").value = audioFile.name;
+        var button = document.getElementById("alarmFile");
+        button.value = audioFile.name;
+        button.innerHTML = getName(audioFile.name);
 
     };
     fileInput.click();
 
+}
+function getName(path) {
+    var index = path.lastIndexOf("\\");
+    return path.substring(index + 1, path.length);
 }
 
 function creatVALARM(trigger, description) {
