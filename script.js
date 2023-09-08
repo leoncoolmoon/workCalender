@@ -9,6 +9,9 @@ var languages = {
         "create": "OK",
         "cancel": "Cancel",
         "clear": "Clear",
+        "clearAll": "Clear all shifts",
+        "import": "Import ICS file",
+        "notCompatible": "Your ICS file is incompatible with this app.",
         "save": "Save",
         "reminder": "Reminder",
         "alarmAudio": "Alarm audio",
@@ -40,6 +43,9 @@ var languages = {
         "create": "确认",
         "cancel": "取消",
         "clear": "清空",
+        "clearAll": "清空所有班次",
+        "import": "导入ICS文件",
+        "notCompatible": "您的ICS文件与此应用不兼容。",
         "save": "保存",
         "reminder": "提醒",
         "alarmAudio": "闹钟音频",
@@ -224,7 +230,8 @@ window.onload = function () {
     shiftTypeListDiv.style.top = "0px";
     shiftTypeListDiv.style.left = "0px";
     shiftTypeListDiv.style.width = "inherit";
-    // shiftTypeListDiv.style.height = "80%";
+    shiftTypeListDiv.style.overflowY = "auto";
+    shiftTypeListDiv.style.height = "100%";
     shiftEditerDiv.appendChild(shiftTypeListDiv);
 
     //addShiftTypeDiv, removeShiftTypeBt, editShiftTypeBt;
@@ -640,13 +647,124 @@ function generateCalendar(displayM) {
     downloadButton.style.verticalAlign = "middle";
     downloadButton.style.cursor = "pointer";
     downloadButton.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    var clearButton = downloadButton.cloneNode(true);
+    var importButton = downloadButton.cloneNode(true);
     downloadButton.addEventListener("click", function (event) {
         downloadRoster();
-    }
-    );
+    });
     rightDiv.innerHTML = "";
     rightDiv.appendChild(downloadButton);
     centerDiv.innerHTML = year;
+    clearButton.id = "clearButton";
+    clearButton.innerHTML = language.clearAll;
+    clearButton.addEventListener("click", function (event) {
+        shifts = [];
+        generateCalendar(0);
+    });
+    leftDiv.innerHTML = "";
+    leftDiv.appendChild(clearButton);
+    importButton.id = "importButton";
+    importButton.innerHTML = language.import;
+    importButton.addEventListener("click", function (event) {
+        //打开文件对话框，只接受ics文件
+        var fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.ics';
+        fileInput.onchange = function () {
+            importRoster(fileInput.files[0]);
+        };
+        fileInput.click();
+
+        //打开后把文件内容发给importRoster(fileContent)
+
+    });
+    leftDiv.appendChild(importButton);
+
+}
+//拖放文件到浏览器窗口
+
+document.addEventListener("dragenter", function (event) {
+    //阻止默认动作
+    event.preventDefault();
+}, false);
+document.addEventListener("dragover", function (event) {
+    //阻止默认动作
+    event.preventDefault();
+}, false);
+document.addEventListener("drop", function (event) {
+    //阻止默认动作
+    event.preventDefault();
+    importRoster(event.dataTransfer.files[0]);
+}, false);
+
+//shifts = [{date: "2021-01-01T00:00:00.000Z", uid: "1"}, {date: "2021-01-02T00:00:00.000Z", uid: "2"}];
+function importRoster(file) {
+    //解析ics文件内容，把里面的班次信息提取出来，放到shifts里面
+    var reader = new FileReader();
+    reader.onload = function () {
+        var content = reader.result;
+        var lines = content.split("\n");
+        let shift = {};
+        var uidSwitch = false;
+        var alarmTime = undefined;
+        // 遍历每一行
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line === 'BEGIN:VEVENT') { // 开始一个新的班
+                shift = {};
+            } else if (line === 'END:VEVENT') {// 结束当前班，将其添加到班数列中
+                shifts.push(shift);
+            } else if (line.startsWith('DTSTART:')) { // 提取班日期
+                //提取日期并转成本地日期格式文本
+                //从line的第8个字符开始取8个字符
+                alarmTime = parseICSDateTime(line.substring(8));
+            } else if (line.startsWith('UID:')) {// 提取班次UID
+                if (uidSwitch) {
+                    shift.uid = line.substring(4);
+                    uidSwitch = false;
+                    //fix next line:
+                    var tm = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid).start;
+                    if (tm == undefined) return;
+                    shift.date = minusTime(alarmTime, tm);
+                }
+            } else if (line.startsWith('BEGIN:VALARM')) {// 提取班次UID控制
+                uidSwitch = true;
+            } else if (line.startsWith('END:VALARM')) {// 提取班次UID控制
+                uidSwitch = false;
+            } else if (line.startsWith('PRODID:')) {//判断是否兼容
+                if (line.substring(7) != "-//leoncoolmoon/workCalender//workCalender v1.0//EN") {
+                    alert(language.notCompatible);
+                    return;
+                }
+            }
+        }
+        generateCalendar(0);
+    };
+    reader.readAsText(file);
+}
+function parseICSDateTime(dateTimeString) {
+    //有bug，时间转换后不能还原原来的时间
+
+    // 移除"T"和"Z"字符
+    dateTimeString = dateTimeString.replace("T", "").replace("Z", "");
+
+    // 将ICS日期时间字符串转换为JavaScript的Date对象
+    const year = dateTimeString.substring(0, 4);
+    const month = dateTimeString.substring(4, 6) - 1; // 月份从0开始，需要减去1
+    const day = dateTimeString.substring(6, 8);
+    const hour = dateTimeString.substring(8, 10);
+    const minute = dateTimeString.substring(10, 12);
+    const second = dateTimeString.substring(12, 14);
+
+    const date = new Date(year, month, day, hour, minute, second);
+    // 获取本地时区与UTC的分钟差异
+    const timezoneOffset = date.getTimezoneOffset();
+
+    // 调整时间偏移
+    date.setMinutes(date.getMinutes() - timezoneOffset);
+    // 返回JavaScript本地时间的ISO字符串
+
+    return date.toISOString();
 }
 
 function generateMonth(year, month, container) {
@@ -881,7 +999,7 @@ function getName(path) {
 }
 
 
-function creatVALARM(trigger, description) {
+function creatVALARM(trigger, description, audioFile, uid) {
     if (trigger == null || trigger == undefined || trigger == "") {
         return "";
     }
@@ -889,12 +1007,13 @@ function creatVALARM(trigger, description) {
         description = "Reminder";
     }
     var alarm = "BEGIN:VALARM\n"
+        + "UID:" + uid + "\n"
         + "TRIGGER:" + trigger + "\n"
         + "ACTION:DISPLAY\n"
         + "DESCRIPTION:" + description + "\n"
-        + "END:VALARM";
+        + "END:VALARM\n";
     if (audioFile != null) {
-        alarm = alarm + "\n"
+        alarm = alarm
             + "BEGIN:VALARM\n"
             + "TRIGGER:" + trigger + "\n"
             + "ACTION:AUDIO\n"
@@ -974,7 +1093,7 @@ function downloadRoster() {
         var t = typeof (shiftType.start);
         //now
         var created = new Date().toISOString();
-        vevents.push(createVEvent(start, end, shiftType.summary, created, creatVALARM(shiftType.trigger, shiftType.description)));
+        vevents.push(createVEvent(start, end, shiftType.summary, created, creatVALARM(shiftType.trigger, shiftType.description, shiftType.audioFile, shiftType.uid)));
     });
     var vcalendar = createVCalendar(vevents);
     downloadVCalendar(vcalendar);
@@ -996,7 +1115,22 @@ function addTime(dateStr, timeStr) {
     // 将新的日期对象转换回字符串
     return date.toISOString();
 }
+function minusTime(dateStr, timeStr) {
+    // 将日期字符串解析为 Date 对象
+    var date = new Date(dateStr);
 
+    // 将时间段字符串分解为小时和分钟
+    var timeParts = timeStr.split(':');
+    var hours = parseInt(timeParts[0]);
+    var minutes = parseInt(timeParts[1]);
+
+    // 将时间段添加到日期上
+    date.setHours(date.getHours() - hours);
+    date.setMinutes(date.getMinutes() - minutes);
+
+    // 将新的日期对象转换回字符串
+    return date.toISOString();
+}
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0,
@@ -1006,19 +1140,19 @@ function generateUUID() {
 }
 // 保存shifts[] 和 shiftTypeTable[]到localStorage
 function saveRoster() {
-    var shiftString = JSON.stringify(shifts);
+    // var shiftString = JSON.stringify(shifts);
+    // localStorage.setItem("shifts", shiftString);
     var shiftTypeString = JSON.stringify(shiftTypeTable);
-    localStorage.setItem("shifts", shiftString);
     localStorage.setItem("shiftTypeTable", shiftTypeString);
 }
 
 // 从localStorage中读取shifts[] 和 shiftTypeTable[]
 function loadRoster() {
-    var shiftString = localStorage.getItem("shifts");
+    // var shiftString = localStorage.getItem("shifts");
+    // if (shiftString != null) {
+    //     shifts = JSON.parse(shiftString);
+    // }
     var shiftTypeString = localStorage.getItem("shiftTypeTable");
-    if (shiftString != null) {
-        shifts = JSON.parse(shiftString);
-    }
     if (shiftTypeString != null) {
         shiftTypeTable = JSON.parse(shiftTypeString);
     }
