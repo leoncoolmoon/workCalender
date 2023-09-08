@@ -24,7 +24,7 @@ var languages = {
         "add": "Add",
         "remove": "Remove",
         "edit": "Edit",
-        "selectAbleTimes": ["5 minutes before", "10 minutes before", "15 minutes before", "20 minutes before", "30 minutes before", "45 minutes before", "1 hour before", "1.5 hours before", "2 hours before"],
+        "selectAbleTimes": ["no alarm ", "5 minutes before", "10 minutes before", "15 minutes before", "20 minutes before", "30 minutes before", "45 minutes before", "1 hour before", "1.5 hours before", "2 hours before"],
         "weekNames": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
         "openFile": "Open file",
@@ -55,16 +55,16 @@ var languages = {
         "add": "添加",
         "remove": "删除",
         "edit": "编辑",
-        "selectAbleTimes": ["提前5分钟", "提前10分钟", "提前15分钟", "提前20分钟", "提前30分钟", "提前45分钟", "提前1小时", "提前1个半小时", "提前2小时"],
+        "selectAbleTimes": ["无提醒", "提前5分钟", "提前10分钟", "提前15分钟", "提前20分钟", "提前30分钟", "提前45分钟", "提前1小时", "提前1个半小时", "提前2小时"],
         "weekNames": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
-        "monthNames": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二"],
+        "monthNames": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
         "openFile": "打开文件",
         "download": "下载班表"
 
     }
 };
 
-var selectAbleTimesValue = ["-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
+var selectAbleTimesValue = ["", "-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
 
 var shifts = [];//班表
 var shiftTypeTable = [];//存放可选的shift类型
@@ -79,10 +79,15 @@ var oldLandscape = true;
 // 日历div，操作div，操作div的背景遮罩，顶部信息div，中间日历显示div，班次信息编辑用div，班次类型信息编辑用div
 var calendarDiv, operateDiv, operateBoxDiv, topDiv, middleDiv, shiftEditerDiv, shiftTypeEditBoxDiv;
 var shiftTypeListDiv;
-var addShiftTypeBt,clearShiftBt, removeShiftTypeBt, editShiftTypeBt;
+var addShiftTypeBt, clearShiftBt, removeShiftTypeBt, editShiftTypeBt;
 var leftDiv, centerDiv, rightDiv;
 var selectedDate = null;
 var selectedDateD = null;
+var cMonth = null;
+
+var date = new Date();
+var year = date.getFullYear();
+
 window.onresize = function () {
     checkLandscape();
     if (oldLandscape != landscape) {
@@ -97,45 +102,45 @@ window.onbeforeunload = function () {
 window.onload = function () {
     checkLandscape();
     //用来展示图例的div
- //读取cookie
-loadRoster();
-topDiv = document.createElement("div");
-topDiv.id = "topDiv";
-topDiv.style.display = "grid";
+    //读取cookie
+    loadRoster();
+    topDiv = document.createElement("div");
+    topDiv.id = "topDiv";
+    topDiv.style.display = "grid";
 
-topDiv.style.zIndex = "100";
-topDiv.style.position = "fixed";
-topDiv.style.top = "0";
-topDiv.style.left = "0";
-topDiv.style.width = "100vw";
-topDiv.style.height = "5vh";
-topDiv.style.gridTemplateColumns = "1fr 1fr 1fr";
-topDiv.style.gridTemplateAreas = "'left center right'";
-topDiv.style.justifyContent = "space-around";
-leftDiv = document.createElement("div");
-leftDiv.id = "leftDiv";
-leftDiv.style.gridArea = "left";
-leftDiv.style.textAlign = "left";
-leftDiv.style.alignItems = "center";
-leftDiv.style.verticalAlign = "middle";
-leftDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-topDiv.appendChild(leftDiv);
-centerDiv = document.createElement("div");
-centerDiv.id = "centerDiv";
-centerDiv.style.gridArea = "center";
-centerDiv.style.textAlign = "center";
-centerDiv.style.alignItems = "center";
-centerDiv.style.verticalAlign = "middle";
-centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-topDiv.appendChild(centerDiv);
-rightDiv = document.createElement("div");
-rightDiv.id = "rightDiv";
-rightDiv.style.gridArea = "right";
-rightDiv.style.textAlign = "right";
-rightDiv.style.alignItems = "center";
-rightDiv.style.verticalAlign = "middle";
-rightDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-topDiv.appendChild(rightDiv);
+    topDiv.style.zIndex = "100";
+    topDiv.style.position = "fixed";
+    topDiv.style.top = "0";
+    topDiv.style.left = "0";
+    topDiv.style.width = "100vw";
+    topDiv.style.height = "5vh";
+    topDiv.style.gridTemplateColumns = "1fr 1fr 1fr";
+    topDiv.style.gridTemplateAreas = "'left center right'";
+    topDiv.style.justifyContent = "space-around";
+    leftDiv = document.createElement("div");
+    leftDiv.id = "leftDiv";
+    leftDiv.style.gridArea = "left";
+    leftDiv.style.textAlign = "left";
+    leftDiv.style.alignItems = "center";
+    leftDiv.style.verticalAlign = "middle";
+    leftDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    topDiv.appendChild(leftDiv);
+    centerDiv = document.createElement("div");
+    centerDiv.id = "centerDiv";
+    centerDiv.style.gridArea = "center";
+    centerDiv.style.textAlign = "center";
+    centerDiv.style.alignItems = "center";
+    centerDiv.style.verticalAlign = "middle";
+    centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    topDiv.appendChild(centerDiv);
+    rightDiv = document.createElement("div");
+    rightDiv.id = "rightDiv";
+    rightDiv.style.gridArea = "right";
+    rightDiv.style.textAlign = "right";
+    rightDiv.style.alignItems = "center";
+    rightDiv.style.verticalAlign = "middle";
+    rightDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    topDiv.appendChild(rightDiv);
 
 
 
@@ -255,7 +260,7 @@ topDiv.appendChild(rightDiv);
     addShiftTypeBt.style.verticalAlign = "middle";
     addShiftTypeBt.style.cursor = "pointer";
     clearShiftBt = addShiftTypeBt.cloneNode(true);
-    
+
     addShiftTypeBt.addEventListener("click", function (event) {
         //添加班次类型
         shiftTypeEditBoxDiv.style.display = "block";
@@ -284,7 +289,7 @@ topDiv.appendChild(rightDiv);
     shiftTypeEditBoxDiv.style.display = "none";
     shiftTypeEditBoxDiv.style.position = "fixed";
     shiftTypeEditBoxDiv.style.zIndex = "120";
-    shiftTypeEditBoxDiv.style.width = "90%";
+    shiftTypeEditBoxDiv.style.width = "inherit";
     shiftTypeEditBoxDiv.style.height = "90%";
     shiftTypeEditBoxDiv.style.fontSize = "5vh";
     shiftTypeEditBoxDiv.style.textAlign = "center";
@@ -482,7 +487,7 @@ function clearForm() {
     document.getElementById("alarmFile").value = "";
     document.getElementById("alarmFile").innerHTML = language.openFile;
     document.getElementById("color").value = "#ff0000";
-    document.getElementById("contentDiv").dataset.id = undefined; 
+    document.getElementById("contentDiv").dataset.id = undefined;
 }
 function loadShiftType() {
 
@@ -513,11 +518,11 @@ function loadShiftType() {
                 //赋予当前选择日期当前的班次类型
                 var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
                 //TODO:赋予当前选择日期当前的班次类型
-                if (existShift != undefined) {
-                shifts.push({ date: selectedDateD.toISOString(), uid: this.id });
-            }else{
-                existShift.uid = this.id;
-            }
+                if (existShift == undefined) {
+                    shifts.push({ date: selectedDateD.toISOString(), uid: this.id });
+                } else {
+                    existShift.uid = this.id;
+                }
                 selectedDate.style.backgroundColor = this.style.backgroundColor;
                 selectedDate.style.border = "";
                 operateBoxDiv.style.display = "none";
@@ -584,6 +589,7 @@ function generateCalendar(displayM) {
     const yearHeading = document.createElement("h1");
     yearHeading.id = "year";
     yearHeading.addEventListener("click", function () { if (displayMonthMode) { generateCalendar(0); } });
+    // yearHeading.innerHTML = year;
 
     // 创建 div 元素
     const monthContainer = document.createElement("div");
@@ -594,9 +600,6 @@ function generateCalendar(displayM) {
     calendarDiv.appendChild(yearHeading);
     calendarDiv.appendChild(monthContainer);
 
-    var date = new Date();
-    var year = date.getFullYear();
-    // yearHeading.innerHTML = year;
 
     if (displayM === 0) {
         displayMonthMode = false;
@@ -606,6 +609,18 @@ function generateCalendar(displayM) {
     } else if (displayM >= 1 && displayM <= 12) {
         displayMonthMode = true;
         generateMonth(year, displayM - 1, monthContainer);
+        //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
+        monthContainer.style.display = "block";
+        //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
+    } else if (displayM === 13 && displayMonthMode) {
+        if (cMonth === 11) { year++; cMonth = 0; } else { cMonth++; }
+        generateMonth(year, cMonth, monthContainer);
+        //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
+        monthContainer.style.display = "block";
+        //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
+    } else if (displayM === 14 && displayMonthMode) {
+        if (cMonth === 0) { year--; cMonth = 11; } else { cMonth--; }
+        generateMonth(year, cMonth, monthContainer);
         //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
         monthContainer.style.display = "block";
         //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
@@ -635,9 +650,43 @@ function generateCalendar(displayM) {
 }
 
 function generateMonth(year, month, container) {
+    cMonth = month;
     var monthDiv = document.createElement("div");
     var monthTitle = document.createElement("h2");
     monthTitle.innerHTML = language.monthNames[month];
+    if (displayMonthMode) {
+        var next = document.createElement("button");
+        next.id = "next";
+        next.innerHTML = ">";
+        next.style.float = "right";
+        next.style.fontSize = "1.5em";
+        next.style.borderRadius = "1vw";
+        next.style.margin = "1vw";
+        next.style.padding = "1vw";
+        next.style.display = "inline-block";
+        next.style.textAlign = "center";
+        next.style.alignItems = "center";
+        next.style.verticalAlign = "middle";
+        next.style.cursor = "pointer";
+        next.style.textShadow = "gray 0.2em 0.1em 0.2em";
+        var previous = next.cloneNode(true);
+        previous.innerHTML = "<";
+        previous.id = "previous";
+        previous.style.float = "left";
+        monthTitle.insertAdjacentHTML('beforeend', next.outerHTML.replace("<button", "<button onclick = 'generateCalendar(13)' "));
+        monthTitle.insertAdjacentHTML('afterbegin', previous.outerHTML.replace("<button", "<button onclick = 'generateCalendar(14)' "));
+        // document.getElementById("previous").addEventListener("click", function (event) {
+        //     if (event.target.id == "previous") {
+        //         generateCalendar(month);
+        //     }
+        // });
+        // document.getElementById("next").addEventListener("click", function (event) {
+        //     if (event.target.id == "next") {
+        //         generateCalendar(month + 2);
+        //     }
+        //});
+    }
+
     monthDiv.appendChild(monthTitle);
     monthDiv.id = month + 1;
     if (displayMonthMode) {
@@ -647,7 +696,13 @@ function generateMonth(year, month, container) {
         monthDiv.className = "month";
         monthDiv.style.height = "inherit";
         monthDiv.style.fontSize = "1.5em";
-        monthDiv.addEventListener("click", function () { if (!displayMonthMode) { generateCalendar(parseInt(this.id)) } });
+        monthDiv.addEventListener("click", function (event) {
+            if (!displayMonthMode) {
+                // if (event.target.id == this.id) {
+                generateCalendar(parseInt(this.id))
+                // }
+            }
+        });
     }
     var grid = document.createElement("div");
     grid.className = "grid-container";
@@ -758,7 +813,7 @@ function removeShiftType(uid) {//删除shift类型
     shiftTypeTable.splice(i, 1);
 }
 function updateShiftType(shiftType) {//修改shift类型
-    var i = findShiftType(shiftType.uid); 
+    var i = findShiftType(shiftType.uid);
     if (i == undefined) {
         //alert(language.shiftNotFound);
         return;
@@ -772,17 +827,17 @@ function add24(time) {
 }
 function rm24(time) {
     var hour = parseInt(time.substring(0, 2));
-    if(hour<24)
+    if (hour < 24)
         return time;
     hour = hour - 24;
     return hour + time.substring(2, 5);
 }
 function addShiftType() {//添加shift类型
     var shiftTpye = {};
-    
+
     shiftTpye.start = document.getElementById("start").value;//shift类型所对应的开始时间
     shiftTpye.end = document.getElementById("end").value;//shift类型所对应的结束时间
-    if(shiftTpye.end<shiftTpye.start){
+    if (shiftTpye.end < shiftTpye.start) {
         shiftTpye.end = add24(shiftTpye.end);
     }
     shiftTpye.summary = document.getElementById("summary").value;//shift类型：从am，pm，night，dayoff，vacation，sick，holiday中选择或者自己输入
@@ -827,8 +882,8 @@ function getName(path) {
 
 
 function creatVALARM(trigger, description) {
-    if (trigger == null) {
-        trigger = "-PT15M";
+    if (trigger == null || trigger == undefined || trigger == "") {
+        return "";
     }
     if (description == null) {
         description = "Reminder";
@@ -844,7 +899,7 @@ function creatVALARM(trigger, description) {
             + "TRIGGER:" + trigger + "\n"
             + "ACTION:AUDIO\n"
             + "ATTACH;VALUE=URI:file://" + audioFile + "\n"
-            + "END:VALARM";
+            + "END:VALARM\n";
     }
     //ATTACH;FMTTYPE=audio/basic:file:///sdcard/notifications/notification.mp3
     return alarm;
@@ -887,7 +942,7 @@ function createVEvent(start, end, summary, created, alarm) {
         + "DTSTART:" + dtstart + "\n"
         + "DTEND:" + dtend + "\n"
         + "SUMMARY:" + summary + "\n"
-        + alarm + "\n"
+        + alarm
         + "END:VEVENT";
 
     return vevent;
@@ -914,9 +969,9 @@ function downloadRoster() {
     shifts.forEach(shift => {
         var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
         //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
-        var start = addTime(shift.date,shiftType.start);
-        var end = addTime(shift.date,shiftType.end);
-        var t= typeof(shiftType.start);
+        var start = addTime(shift.date, shiftType.start);
+        var end = addTime(shift.date, shiftType.end);
+        var t = typeof (shiftType.start);
         //now
         var created = new Date().toISOString();
         vevents.push(createVEvent(start, end, shiftType.summary, created, creatVALARM(shiftType.trigger, shiftType.description)));
