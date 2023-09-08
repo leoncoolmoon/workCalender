@@ -30,7 +30,7 @@ var languages = {
         "openFile": "Open file",
         "download": "Download roster"
     },
-    zh: {
+    zhCN: {
         "title": "创建一个事件",
         "start": "开始",
         "end": "结束",
@@ -69,7 +69,7 @@ var selectAbleTimesValue = ["-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-P
 var shifts = [];//班表
 var shiftTypeTable = [];//存放可选的shift类型
 var audioFile = null;//alarm的音频文件
-var lang = navigator.language || navigator.userLanguage;
+var lang = (navigator.language || navigator.userLanguage).replace("-", "");
 var language = languages[lang] || languages.en;
 var monthModeHeight = "10vh";
 //var adjustHeight = "inherit";
@@ -482,6 +482,7 @@ function clearForm() {
     document.getElementById("alarmFile").value = "";
     document.getElementById("alarmFile").innerHTML = language.openFile;
     document.getElementById("color").value = "#ff0000";
+    document.getElementById("contentDiv").dataset.id = undefined; 
 }
 function loadShiftType() {
 
@@ -510,8 +511,13 @@ function loadShiftType() {
         shiftType.addEventListener("click", function (event) {
             if (event.target.id == this.id) {
                 //赋予当前选择日期当前的班次类型
+                var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
                 //TODO:赋予当前选择日期当前的班次类型
-                shifts.push({ date: selectedDateD, uid: this.id });
+                if (existShift != undefined) {
+                shifts.push({ date: selectedDateD.toISOString(), uid: this.id });
+            }else{
+                existShift.uid = this.id;
+            }
                 selectedDate.style.backgroundColor = this.style.backgroundColor;
                 selectedDate.style.border = "";
                 operateBoxDiv.style.display = "none";
@@ -535,7 +541,7 @@ function loadShiftType() {
         //编辑当前的班次类型
         editShiftTypeBt.innerHTML = language.edit;
         editShiftTypeBt.addEventListener("click", function (event) {
-            editShiftTpye(shiftType.id);
+            editShiftTpye(event.target.parentNode.id);
             shiftTypeEditBoxDiv.style.display = "block";
             centerDiv.innerHTML = language.editShiftType;
         });
@@ -696,7 +702,7 @@ function generateMonth(year, month, container) {
                 break;
             } else {
                 var d = new Date(year, month, date).toISOString().substring(0, 10);
-                var n = shifts.find(shift => shift.date.toISOString().substring(0, 10) === d);
+                var n = shifts.find(shift => shift.date.substring(0, 10) === d);
                 var s = n != undefined ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
                 cell.style.backgroundColor = s != undefined ? s.color : "";
                 cell.innerHTML = date;
@@ -720,15 +726,6 @@ function doubleNum(num) {
     return num;
 }
 
-function addShift() {//添加班次
-    var shift = {};
-    shift.date = document.getElementById("date").value;//班次所对应的日期
-    shift.type = document.getElementById("type").value;//班次所对应的类型
-    shifts.push(shift);
-}
-function removeShift() {//删除班次
-
-}
 //班次类型操作 编辑，查找，删除，添加
 function editShiftTpye(uid) {//编辑班次类型
     var i = findShiftType(uid);
@@ -737,7 +734,7 @@ function editShiftTpye(uid) {//编辑班次类型
         return;
     } else {
         document.getElementById("start").value = shiftTypeTable[i].start;
-        document.getElementById("end").value = shiftTypeTable[i].end;
+        document.getElementById("end").value = rm24(shiftTypeTable[i].end);
         document.getElementById("summary").value = shiftTypeTable[i].summary;
         document.getElementById("alarm").value = shiftTypeTable[i].trigger;
         document.getElementById("contentForAlarm").value = shiftTypeTable[i].description;
@@ -768,23 +765,37 @@ function updateShiftType(shiftType) {//修改shift类型
     }
     shiftTypeTable.splice(i, 1, shiftType);
 }
-
-
+function add24(time) {
+    var hour = parseInt(time.substring(0, 2));
+    hour = hour + 24;
+    return hour + time.substring(2, 5);
+}
+function rm24(time) {
+    var hour = parseInt(time.substring(0, 2));
+    if(hour<24)
+        return time;
+    hour = hour - 24;
+    return hour + time.substring(2, 5);
+}
 function addShiftType() {//添加shift类型
     var shiftTpye = {};
+    
     shiftTpye.start = document.getElementById("start").value;//shift类型所对应的开始时间
     shiftTpye.end = document.getElementById("end").value;//shift类型所对应的结束时间
+    if(shiftTpye.end<shiftTpye.start){
+        shiftTpye.end = add24(shiftTpye.end);
+    }
     shiftTpye.summary = document.getElementById("summary").value;//shift类型：从am，pm，night，dayoff，vacation，sick，holiday中选择或者自己输入
     shiftTpye.trigger = document.getElementById("alarm").value;//shift类型所对应的提醒时间
     shiftTpye.description = document.getElementById("contentForAlarm").value;//shift类型所对应的提醒内容
     shiftTpye.audioFile = document.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
     shiftTpye.color = document.getElementById("color").value;//shift类型所对应的颜色
-    if (document.getElementById("contentDiv").dataset.id === undefined) {
+    shiftTpye.uid = document.getElementById("contentDiv").dataset.id;
+    if (shiftTpye.uid == undefined || shiftTpye.uid == "" || shiftTpye.uid == null || shiftTpye.uid == "undefined") {
         shiftTpye.uid = generateUUID();
         //添加shift类型    
         shiftTypeTable.push(shiftTpye);
     } else {
-        shiftTpye.uid = document.getElementById("contentDiv").dataset.id;
         //更新shift类型
         updateShiftType(shiftTpye);
     }
@@ -858,6 +869,17 @@ function createVEvent(start, end, summary, created, alarm) {
     var dtend = formatDateTime(new Date(end));
     var dtstamp = formatDateTime(new Date(created));
 
+    // 将 符合ISO 8601标准的格式 日期对象转换为 iCalendar 日期格式
+    // function formatDate(date) {
+    //     function pad(n) { return n < 10 ? '0' + n : n }
+    //     return date.getUTCFullYear()
+    //         + pad(date.getUTCMonth() + 1)
+    //         + pad(date.getUTCDate());
+    // }
+    // var dtstart = formatDate(start);
+    // var dtend = formatDate(end);
+    // var dtstamp = formatDate(created);
+
     // 创建 VEVENT 组件
     var vevent = "BEGIN:VEVENT\n"
         + "UID:" + uid + "\n"
@@ -874,7 +896,7 @@ function createVCalendar(vevents) {
     // 创建 VCALENDAR 组件
     var vcalendar = "BEGIN:VCALENDAR\n"
         + "VERSION:2.0\n"
-        + "PRODID:-//hacksw/handcal//NONSGML v1.0//EN\n"
+        + "PRODID:-//leoncoolmoon/workCalender//workCalender v1.0//EN\n"
         + vevents.join("\n")
         + "\nEND:VCALENDAR";
 
@@ -891,11 +913,35 @@ function downloadRoster() {
     var vevents = [];
     shifts.forEach(shift => {
         var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
-        vevents.push(createVEvent(shift.date, shift.date, shiftType.summary, shift.date, creatVALARM(shiftType.trigger, shiftType.description)));
+        //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
+        var start = addTime(shift.date,shiftType.start);
+        var end = addTime(shift.date,shiftType.end);
+        var t= typeof(shiftType.start);
+        //now
+        var created = new Date().toISOString();
+        vevents.push(createVEvent(start, end, shiftType.summary, created, creatVALARM(shiftType.trigger, shiftType.description)));
     });
     var vcalendar = createVCalendar(vevents);
     downloadVCalendar(vcalendar);
 }
+
+function addTime(dateStr, timeStr) {
+    // 将日期字符串解析为 Date 对象
+    var date = new Date(dateStr);
+
+    // 将时间段字符串分解为小时和分钟
+    var timeParts = timeStr.split(':');
+    var hours = parseInt(timeParts[0]);
+    var minutes = parseInt(timeParts[1]);
+
+    // 将时间段添加到日期上
+    date.setHours(date.getHours() + hours);
+    date.setMinutes(date.getMinutes() + minutes);
+
+    // 将新的日期对象转换回字符串
+    return date.toISOString();
+}
+
 function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0,
@@ -903,21 +949,22 @@ function generateUUID() {
         return v.toString(16);
     });
 }
-//保存shift[] 和 shiftType[]到cookie
+// 保存shifts[] 和 shiftTypeTable[]到localStorage
 function saveRoster() {
     var shiftString = JSON.stringify(shifts);
     var shiftTypeString = JSON.stringify(shiftTypeTable);
-    setCookie("shifts", shiftString);
-    setCookie("shiftTypeTable", shiftTypeString);
+    localStorage.setItem("shifts", shiftString);
+    localStorage.setItem("shiftTypeTable", shiftTypeString);
 }
-//从cookie中读取shift[] 和 shiftType[]
+
+// 从localStorage中读取shifts[] 和 shiftTypeTable[]
 function loadRoster() {
-    var shiftString = getCookie("shifts");
-    var shiftTypeString = getCookie("shiftTypeTable");
-    if (shiftString != "") {
+    var shiftString = localStorage.getItem("shifts");
+    var shiftTypeString = localStorage.getItem("shiftTypeTable");
+    if (shiftString != null) {
         shifts = JSON.parse(shiftString);
     }
-    if (shiftTypeString != "") {
+    if (shiftTypeString != null) {
         shiftTypeTable = JSON.parse(shiftTypeString);
     }
 }
