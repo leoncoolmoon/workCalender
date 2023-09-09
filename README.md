@@ -22,7 +22,7 @@ This JavaScript code is a shift work roster editor.
 
 ## Usage
 
-To use this shift work roster editor, simply clone the repository and open the `index.html` file in your web browser. 
+To use this shift work roster editor, simply clone the repository and open the [`index.html`](http://leoncoolmoon.github.io/workCalender) file in your web browser. 
 
 ## License
 
