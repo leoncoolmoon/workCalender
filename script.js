@@ -31,7 +31,8 @@ var languages = {
         "weekNames": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
         "openFile": "Open file",
-        "download": "Download roster"
+        "download": "Download all roster",
+        "downloadNew": "Download updated roster"
     },
     zhCN: {
         "title": "创建一个事件",
@@ -65,7 +66,8 @@ var languages = {
         "weekNames": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
         "monthNames": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
         "openFile": "打开文件",
-        "download": "下载班表"
+        "download": "下载全部班表",
+        "downloadNew": "下载更新的班表"
 
     }
 };
@@ -73,6 +75,7 @@ var languages = {
 var selectAbleTimesValue = ["", "-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
 
 var shifts = [];//班表
+var oldShifts = [];//旧班表
 var shiftTypeTable = [];//存放可选的shift类型
 var audioFile = null;//alarm的音频文件
 var lang = (navigator.language || navigator.userLanguage).replace("-", "");
@@ -102,8 +105,12 @@ window.onresize = function () {
 }
 //关闭前调用保存shifts和shifttable到cookie
 window.onbeforeunload = function () {
+    //保存shifts和shifttable到cookie
     saveRoster();
+    downloadRoster(shifts);
 }
+
+
 //初始化
 window.onload = function () {
     checkLandscape();
@@ -650,15 +657,20 @@ function generateCalendar(displayM) {
     var clearButton = downloadButton.cloneNode(true);
     var importButton = downloadButton.cloneNode(true);
     downloadButton.addEventListener("click", function (event) {
-        downloadRoster();
+        downloadRoster([...oldShifts, ...shifts]);
     });
     rightDiv.innerHTML = "";
     rightDiv.appendChild(downloadButton);
     centerDiv.innerHTML = year;
     clearButton.id = "clearButton";
     clearButton.innerHTML = language.clearAll;
-    clearButton.addEventListener("click", function (event) {
+    clearButton.addEventListener("click", function (event) {//clear current
         shifts = [];
+        generateCalendar(0);
+    });
+    clearButton.addEventListener("dblclick", function (event) {//all clear
+        shifts = [];
+        oldShifts = [];
         generateCalendar(0);
     });
     leftDiv.innerHTML = "";
@@ -875,7 +887,7 @@ function generateMonth(year, month, container) {
                 break;
             } else {
                 var d = new Date(year, month, date).toISOString().substring(0, 10);
-                var n = shifts.find(shift => shift.date.substring(0, 10) === d);
+                var n = [...oldShifts, ...shifts].find(shift => shift.date.substring(0, 10) === d);
                 var s = n != undefined ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
                 cell.style.backgroundColor = s != undefined ? s.color : "";
                 cell.innerHTML = date;
@@ -980,14 +992,17 @@ function selectFile() {//打开 打开文件对话框来从本地选择一个文
 
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
+    fileInput.id = "audioInput";
     //接受音频文件
     fileInput.accept = 'audio/*';
     //fileInput.accept = plainTextFile;//+ "," + STL;
     fileInput.onchange = function (event) {
         audioFile = event.target.files[0];
         var button = document.getElementById("alarmFile");
-        button.value = audioFile.name;
-        button.innerHTML = getName(audioFile.name);
+        var path = (window.URL || window.webkitURL).createObjectURL(audioFile);
+        console.log('path', path);
+        button.value = this.value;//系统阻止了获取文件名
+        button.innerHTML = audioFile.name;
 
     };
     fileInput.click();
@@ -1083,9 +1098,9 @@ function downloadVCalendar(vcalendar) {
     link.setAttribute('download', 'event.ics');
     link.click();
 }
-function downloadRoster() {
+function downloadRoster(shiftsA) {
     var vevents = [];
-    shifts.forEach(shift => {
+    shiftsA.forEach(shift => {
         var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
         //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
         var start = addTime(shift.date, shiftType.start);
@@ -1093,7 +1108,10 @@ function downloadRoster() {
         var t = typeof (shiftType.start);
         //now
         var created = new Date().toISOString();
-        vevents.push(createVEvent(start, end, shiftType.summary, created, creatVALARM(shiftType.trigger, shiftType.description, shiftType.audioFile, shiftType.uid)));
+        var valarm = creatVALARM(shiftType.trigger, shiftType.description, shiftType.audioFile, shiftType.uid);
+        if (valarm != "") {//不带提醒的班次不导出
+            vevents.push(createVEvent(start, end, shiftType.summary, created, valarm));
+        }
     });
     var vcalendar = createVCalendar(vevents);
     downloadVCalendar(vcalendar);
@@ -1140,18 +1158,18 @@ function generateUUID() {
 }
 // 保存shifts[] 和 shiftTypeTable[]到localStorage
 function saveRoster() {
-    // var shiftString = JSON.stringify(shifts);
-    // localStorage.setItem("shifts", shiftString);
+    var shiftString = JSON.stringify([...oldShifts, ...shifts]);
+    localStorage.setItem("shifts", shiftString);
     var shiftTypeString = JSON.stringify(shiftTypeTable);
     localStorage.setItem("shiftTypeTable", shiftTypeString);
 }
 
 // 从localStorage中读取shifts[] 和 shiftTypeTable[]
 function loadRoster() {
-    // var shiftString = localStorage.getItem("shifts");
-    // if (shiftString != null) {
-    //     shifts = JSON.parse(shiftString);
-    // }
+    var shiftString = localStorage.getItem("shifts");
+    if (shiftString != null) {
+        oldShifts = JSON.parse(shiftString);
+    }
     var shiftTypeString = localStorage.getItem("shiftTypeTable");
     if (shiftTypeString != null) {
         shiftTypeTable = JSON.parse(shiftTypeString);
