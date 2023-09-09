@@ -879,10 +879,10 @@ function generateMonth(year, month, container) {
         cell.innerHTML = language.weekNames[j];
         if (displayMonthMode) {
             cell.style.height = monthModeHeight;
-            cell.style.fontSize = "3em";
+            //cell.style.fontSize = "3em";
         } else {
             cell.style.height = "inherit";
-            cell.style.fontSize = "1.5em";
+           // cell.style.fontSize = "1.5em";
         }
         cell.style.height = displayMonthMode ? monthModeHeight : "inherit";
         cell.classList.add("weekend");
@@ -908,10 +908,10 @@ function generateMonth(year, month, container) {
                     selectedDateD = new Date(year, month, parseInt(selectedDate.innerHTML));
                 });
                 cell.style.height = monthModeHeight;
-                cell.style.fontSize = "3em";
+                //cell.style.fontSize = "3em";
             } else {
                 cell.style.height = "inherit";
-                cell.style.fontSize = "1.5em";
+                //cell.style.fontSize = "1.5em";
             }
             if (i === 0 && j < firstDay) {
                 cell.innerHTML = "";
