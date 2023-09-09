@@ -31,7 +31,7 @@ var languages = {
         "weekNames": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
         "openFile": "Open file",
-        "download": "Download all roster",
+        "download": "Download roster",
         "downloadNew": "Download updated roster"
     },
     zhCN: {
@@ -66,7 +66,7 @@ var languages = {
         "weekNames": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
         "monthNames": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
         "openFile": "打开文件",
-        "download": "下载全部班表",
+        "download": "下载班表",
         "downloadNew": "下载更新的班表"
 
     }
@@ -77,6 +77,7 @@ var selectAbleTimesValue = ["", "-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M",
 var shifts = [];//班表
 var oldShifts = [];//旧班表
 var shiftTypeTable = [];//存放可选的shift类型
+var downloaded = true;//是否已经下载了班表
 var audioFile = null;//alarm的音频文件
 var lang = (navigator.language || navigator.userLanguage).replace("-", "");
 var language = languages[lang] || languages.en;
@@ -107,7 +108,9 @@ window.onresize = function () {
 window.onbeforeunload = function () {
     //保存shifts和shifttable到cookie
     saveRoster();
-    downloadRoster(shifts);
+    if (shifts.length > 0 && !downloaded) {
+        downloadRoster(shifts);
+    }
 }
 
 
@@ -402,23 +405,23 @@ window.onload = function () {
     contentForAlarmContainer.appendChild(contentForAlarm);
     contentDiv.appendChild(contentForAlarmContainer);
 
-    var alarmFileContainer = document.createElement("div");
-    alarmFileContainer.className = "row"
+    // var alarmFileContainer = document.createElement("div");
+    // alarmFileContainer.className = "row"
     //在alarmFile前增加一个language.alarmAudio的标签
-    var alarmAudioLabel = document.createElement("div");
-    alarmAudioLabel.className = "label"
-    alarmAudioLabel.innerHTML = language.alarmAudio;
-    alarmFileContainer.appendChild(alarmAudioLabel);
-    //alarmSelector 是一个按钮，点击后弹出系统打开文件对话框，选择一个音频文件，返回文件名到alarmFile
-    var alarmSelector = document.createElement("button");
-    alarmSelector.className = "content";
-    alarmSelector.id = "alarmFile";
-    alarmSelector.innerHTML = language.openFile;
-    alarmSelector.addEventListener("click", function (event) {
-        selectFile();
-    });
-    alarmFileContainer.appendChild(alarmSelector);
-    contentDiv.appendChild(alarmFileContainer);
+    // var alarmAudioLabel = document.createElement("div");
+    // alarmAudioLabel.className = "label"
+    // alarmAudioLabel.innerHTML = language.alarmAudio;
+    // alarmFileContainer.appendChild(alarmAudioLabel);
+    // //alarmSelector 是一个按钮，点击后弹出系统打开文件对话框，选择一个音频文件，返回文件名到alarmFile
+    // var alarmSelector = document.createElement("button");
+    // alarmSelector.className = "content";
+    // alarmSelector.id = "alarmFile";
+    // alarmSelector.innerHTML = language.openFile;
+    // alarmSelector.addEventListener("click", function (event) {
+    //     selectFile();
+    // });
+    // alarmFileContainer.appendChild(alarmSelector);
+    // contentDiv.appendChild(alarmFileContainer);
 
     var colorContainer = document.createElement("div");
     colorContainer.className = "row"
@@ -498,8 +501,8 @@ function clearForm() {
     document.getElementById("summary").value = "";
     document.getElementById("alarm").value = "-PT1H";
     document.getElementById("contentForAlarm").value = "";
-    document.getElementById("alarmFile").value = "";
-    document.getElementById("alarmFile").innerHTML = language.openFile;
+    // document.getElementById("alarmFile").value = "";
+    // document.getElementById("alarmFile").innerHTML = language.openFile;
     document.getElementById("color").value = "#ff0000";
     document.getElementById("contentDiv").dataset.id = undefined;
 }
@@ -534,6 +537,7 @@ function loadShiftType() {
                 //TODO:赋予当前选择日期当前的班次类型
                 if (existShift == undefined) {
                     shifts.push({ date: selectedDateD.toISOString(), uid: this.id });
+                    downloaded = false;
                 } else {
                     existShift.uid = this.id;
                 }
@@ -656,8 +660,15 @@ function generateCalendar(displayM) {
     downloadButton.style.textShadow = "gray 0.2em 0.1em 0.2em";
     var clearButton = downloadButton.cloneNode(true);
     var importButton = downloadButton.cloneNode(true);
-    downloadButton.addEventListener("click", function (event) {
+    downloadButton.addEventListener("click", function (event) {//仅下载当前
+        downloadRoster(shifts);
+    });
+    downloadButton.addEventListener("dblclick", function (event) {//下载所有
         downloadRoster([...oldShifts, ...shifts]);
+    });
+    downloadButton.addEventListener("contextmenu", function (event) {//下载shiftType为json文件
+        event.preventDefault();
+        downloadShiftType(shiftTypeTable);
     });
     rightDiv.innerHTML = "";
     rightDiv.appendChild(downloadButton);
@@ -673,11 +684,19 @@ function generateCalendar(displayM) {
         oldShifts = [];
         generateCalendar(0);
     });
+    clearButton.addEventListener("contextmenu", function (event) {//shiftType as well
+        event.preventDefault();
+        shiftTypeTable = [];
+        shifts = [];
+        oldShifts = [];
+        generateCalendar(0);
+    });
+
     leftDiv.innerHTML = "";
     leftDiv.appendChild(clearButton);
     importButton.id = "importButton";
     importButton.innerHTML = language.import;
-    importButton.addEventListener("click", function (event) {
+    importButton.addEventListener("click", function (event) {//导入ics班表文件
         //打开文件对话框，只接受ics文件
         var fileInput = document.createElement('input');
         fileInput.type = 'file';
@@ -690,6 +709,19 @@ function generateCalendar(displayM) {
         //打开后把文件内容发给importRoster(fileContent)
 
     });
+
+    importButton.addEventListener("contextmenu", function (event) {//导入json班次文件
+        event.preventDefault();
+        //打开文件对话框，只接受json文件
+        var fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json';
+        fileInput.onchange = function () {
+            importShiftType(fileInput.files[0]);
+        };
+        fileInput.click();
+    });
+
     leftDiv.appendChild(importButton);
 
 }
@@ -923,8 +955,8 @@ function editShiftTpye(uid) {//编辑班次类型
         document.getElementById("summary").value = shiftTypeTable[i].summary;
         document.getElementById("alarm").value = shiftTypeTable[i].trigger;
         document.getElementById("contentForAlarm").value = shiftTypeTable[i].description;
-        document.getElementById("alarmFile").value = shiftTypeTable[i].audioFile;
-        document.getElementById("alarmFile").innerHTML = getName(shiftTypeTable[i].audioFile);
+        // document.getElementById("alarmFile").value = shiftTypeTable[i].audioFile;
+        // document.getElementById("alarmFile").innerHTML = getName(shiftTypeTable[i].audioFile);
         document.getElementById("color").value = shiftTypeTable[i].color;
         document.getElementById("contentDiv").dataset.id = shiftTypeTable[i].uid;
     }
@@ -960,7 +992,7 @@ function rm24(time) {
     if (hour < 24)
         return time;
     hour = hour - 24;
-    return hour + time.substring(2, 5);
+    return doubleNum(hour) + time.substring(2, 5);
 }
 function addShiftType() {//添加shift类型
     var shiftTpye = {};
@@ -973,7 +1005,7 @@ function addShiftType() {//添加shift类型
     shiftTpye.summary = document.getElementById("summary").value;//shift类型：从am，pm，night，dayoff，vacation，sick，holiday中选择或者自己输入
     shiftTpye.trigger = document.getElementById("alarm").value;//shift类型所对应的提醒时间
     shiftTpye.description = document.getElementById("contentForAlarm").value;//shift类型所对应的提醒内容
-    shiftTpye.audioFile = document.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
+    // shiftTpye.audioFile = document.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
     shiftTpye.color = document.getElementById("color").value;//shift类型所对应的颜色
     shiftTpye.uid = document.getElementById("contentDiv").dataset.id;
     if (shiftTpye.uid == undefined || shiftTpye.uid == "" || shiftTpye.uid == null || shiftTpye.uid == "undefined") {
@@ -1095,10 +1127,41 @@ function downloadVCalendar(vcalendar) {
     // 创建一个下载链接
     var link = document.createElement('a');
     link.setAttribute('href', 'data:text/calendar;charset=utf-8,' + encodeURIComponent(vcalendar));
-    link.setAttribute('download', 'event.ics');
+    var timeStemp = new Date().getTime();
+    link.setAttribute('download', 'myShift'+timeStemp+'.ics');
     link.click();
 }
+function downloadShiftType(shiftTypeTable) {
+    // 创建一个下载链接
+    var link = document.createElement('a');
+    var shiftTypeString = JSON.stringify(shiftTypeTable);
+    link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(shiftTypeString));
+    var timeStemp = new Date().getTime();
+    link.setAttribute('download', 'shiftType'+timeStemp+'.json');
+    link.click();
+}
+function importShiftType(file) {
+    //解析json文件内容，把里面的班次信息提取出来，放到shiftTypeTable里面
+    var reader = new FileReader();
+    reader.onload = function () {
+        var content = reader.result;
+        var shiftTypeTableA = JSON.parse(content);
+        shiftTypeTableA.forEach(shiftType => {
+            var i = findShiftType(shiftType.uid);
+            if (i == undefined) {
+                shiftTypeTable.push(shiftType);
+            } else {
+                shiftTypeTable.splice(i, 1, shiftType);
+            }
+        });
+       };
+    reader.readAsText(file);
+}
+
 function downloadRoster(shiftsA) {
+    if(shiftsA === shifts){
+        downloaded = true;
+    }
     var vevents = [];
     shiftsA.forEach(shift => {
         var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
