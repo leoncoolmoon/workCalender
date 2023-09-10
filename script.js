@@ -100,9 +100,9 @@ var year = date.getFullYear();
 
 window.onresize = function () {
     checkLandscape();
-    if (oldLandscape != landscape) {
-        adjustUI();
-    }
+    //if (oldLandscape != landscape) {
+    adjustUI();
+    //}
 }
 //关闭前调用保存shifts和shifttable到cookie
 window.onbeforeunload = function () {
@@ -490,10 +490,11 @@ window.onload = function () {
 
     //----------------------------------------------------------------
     //用来展示班次类别的div
-    if (oldLandscape != landscape) {
-        adjustUI();
-    }
+
     generateCalendar(0);
+    //if (oldLandscape != landscape) {
+    //adjustUI();
+    // }
 }
 function clearForm() {
     document.getElementById("start").value = "";
@@ -589,18 +590,43 @@ function checkLandscape() {
     }
 }
 function adjustUI() {
-
+    //document.documentElement.clientWidth 
+    // document.documentElement.clientHeight
+    var whRatio = document.documentElement.clientWidth / document.documentElement.clientHeight;
+    var availableRatio = [2 / 6, 3 / 4, 4 / 3, 6 / 2];
     //移动div到中间
     // operateDiv.style.transform = "translate(-50%,-50%)";
 
-    if (landscape) {
+    // if (landscape) {
 
+    // } else {
+
+    // }
+    if (whRatio < (availableRatio[0] + availableRatio[1]) / 2) {
+        //2/6
+        setGrid(2, 6);
+    } else if (whRatio < (availableRatio[1] + availableRatio[2]) / 2) {
+        //3/4
+        setGrid(3, 4);
+    } else if (whRatio < (availableRatio[2] + availableRatio[3] / 2)) {
+        //4/3
+        setGrid(4, 3);
     } else {
-
+        //6/2
+        setGrid(6, 2);
     }
+
 }
 
-
+function setGrid( col,row) {
+    // monthContainer
+    var mthctner = document.getElementById("monthContainer");
+    if (mthctner != null) {
+        mthctner.style.gridTemplateColumns = "repeat(" + col + ", 1fr)";
+        mthctner.style.gridTemplateRows = "repeat(" + row + ", 1fr)";
+        // mthctner.style.height=" 80%";
+    }
+}
 function generateCalendar(displayM) {
     calendarDiv.innerHTML = "";
     // 创建 h1 元素
@@ -723,6 +749,7 @@ function generateCalendar(displayM) {
     });
 
     leftDiv.appendChild(importButton);
+    adjustUI();
 
 }
 //拖放文件到浏览器窗口
@@ -882,7 +909,7 @@ function generateMonth(year, month, container) {
             //cell.style.fontSize = "3em";
         } else {
             cell.style.height = "inherit";
-           // cell.style.fontSize = "1.5em";
+            // cell.style.fontSize = "1.5em";
         }
         cell.style.height = displayMonthMode ? monthModeHeight : "inherit";
         cell.classList.add("weekend");
@@ -1128,7 +1155,7 @@ function downloadVCalendar(vcalendar) {
     var link = document.createElement('a');
     link.setAttribute('href', 'data:text/calendar;charset=utf-8,' + encodeURIComponent(vcalendar));
     var timeStemp = new Date().getTime();
-    link.setAttribute('download', 'myShift'+timeStemp+'.ics');
+    link.setAttribute('download', 'myShift' + timeStemp + '.ics');
     link.click();
 }
 function downloadShiftType(shiftTypeTable) {
@@ -1137,7 +1164,7 @@ function downloadShiftType(shiftTypeTable) {
     var shiftTypeString = JSON.stringify(shiftTypeTable);
     link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(shiftTypeString));
     var timeStemp = new Date().getTime();
-    link.setAttribute('download', 'shiftType'+timeStemp+'.json');
+    link.setAttribute('download', 'shiftType' + timeStemp + '.json');
     link.click();
 }
 function importShiftType(file) {
@@ -1154,12 +1181,12 @@ function importShiftType(file) {
                 shiftTypeTable.splice(i, 1, shiftType);
             }
         });
-       };
+    };
     reader.readAsText(file);
 }
 
 function downloadRoster(shiftsA) {
-    if(shiftsA === shifts){
+    if (shiftsA === shifts) {
         downloaded = true;
     }
     var vevents = [];
