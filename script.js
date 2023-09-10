@@ -140,6 +140,7 @@ window.onload = function () {
     leftDiv.style.alignItems = "center";
     leftDiv.style.display = "flex";
     leftDiv.style.verticalAlign = "middle";
+    leftDiv.style.paddingLeft = "0.5vw";
     leftDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     topDiv.appendChild(leftDiv);
     centerDiv = document.createElement("div");
@@ -148,6 +149,7 @@ window.onload = function () {
     centerDiv.style.textAlign = "center";
     centerDiv.style.alignItems = "center";
     centerDiv.style.verticalAlign = "middle";
+    centerDiv.style.width = "max-content";
     centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     topDiv.appendChild(centerDiv);
     rightDiv = document.createElement("div");
@@ -156,7 +158,9 @@ window.onload = function () {
     rightDiv.style.gridArea = "right";
     rightDiv.style.textAlign = "right";
     rightDiv.style.alignItems = "center";
+    rightDiv.style.justifyContent = "flex-end";
     rightDiv.style.verticalAlign = "middle";
+    rightDiv.style.paddingRight = "0.5vw";
     rightDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     topDiv.appendChild(rightDiv);
 
@@ -232,7 +236,7 @@ window.onload = function () {
     shiftEditerDiv.style.display = " grid";
     shiftEditerDiv.style.fontSize = "5vh";
     shiftEditerDiv.style.textAlign = "center";
-    shiftEditerDiv.style.alignItems = "center";
+    // shiftEditerDiv.style.alignItems = "center";
 
     shiftTypeListDiv = document.createElement("div");
     shiftTypeListDiv.id = "shiftTypeListDiv";//用来列出所有班次类型
@@ -243,7 +247,7 @@ window.onload = function () {
     shiftTypeListDiv.style.left = "0px";
     shiftTypeListDiv.style.width = "inherit";
     shiftTypeListDiv.style.overflowY = "auto";
-    shiftTypeListDiv.style.height = "100%";
+    shiftTypeListDiv.style.height = "85%";
     shiftEditerDiv.appendChild(shiftTypeListDiv);
 
     //addShiftTypeDiv, removeShiftTypeBt, editShiftTypeBt;
@@ -257,9 +261,12 @@ window.onload = function () {
     shiftBtDiv.style.display = "flex";
     shiftBtDiv.style.position = "absolute";
     shiftBtDiv.style.bottom = "0";
+    shiftBtDiv.style.justifyContent = "space-around";
+    //最小高度为5vh
+    shiftBtDiv.style.minHeight = "5vh";
     // shiftBtDiv.style.justifyContent = "space-around";
     // shiftBtDiv.style.alignItems = "center";
-    // shiftBtDiv.style.width = "100%";
+    shiftBtDiv.style.width = "100%";
     // shiftBtDiv.style.height = "10%";
     shiftEditerDiv.appendChild(shiftBtDiv);
 
@@ -278,6 +285,7 @@ window.onload = function () {
     // addShiftTypeDiv.style.width = "80%";
     addShiftTypeBt.style.verticalAlign = "middle";
     addShiftTypeBt.style.cursor = "pointer";
+    addShiftTypeBt.style.height = "auto";
     clearShiftBt = addShiftTypeBt.cloneNode(true);
 
     addShiftTypeBt.addEventListener("click", function (event) {
@@ -1193,12 +1201,13 @@ function importShiftType(file) {
         var shiftTypeTableA = JSON.parse(content);
         shiftTypeTableA.forEach(shiftType => {
             var i = findShiftType(shiftType.uid);
-            if (i == undefined) {
+            if (i == undefined || i == -1) {
                 shiftTypeTable.push(shiftType);
             } else {
                 shiftTypeTable.splice(i, 1, shiftType);
             }
         });
+        loadShiftType();
     };
     reader.readAsText(file);
 }
