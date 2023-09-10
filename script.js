@@ -596,12 +596,22 @@ function adjustUI() {
     var availableRatio = [2 / 6, 3 / 4, 4 / 3, 6 / 2];
     //移动div到中间
     // operateDiv.style.transform = "translate(-50%,-50%)";
+  /*  var grid = document.getElementsByClassName("grid-container");
 
-    // if (landscape) {
-
-    // } else {
-
-    // }
+    if (grid != null) {
+        if (displayMonthMode) {
+            grid.style.border = "0.2vw solid black";
+            grid.style.borderRadius = "1vw";
+            grid.style.fontSize = "XX-Large";
+        } else {
+            if (landscape) {
+                grid.style.fontSize = "small";
+            } else {
+                grid.style.fontSize = "X-Large";
+            }
+        }
+    }
+*/
     if (whRatio < (availableRatio[0] + availableRatio[1]) / 2) {
         //2/6
         setGrid(2, 6);
@@ -618,7 +628,7 @@ function adjustUI() {
 
 }
 
-function setGrid( col,row) {
+function setGrid(col, row) {
     // monthContainer
     var mthctner = document.getElementById("monthContainer");
     if (mthctner != null) {
@@ -918,9 +928,15 @@ function generateMonth(year, month, container) {
     if (displayMonthMode) {
         grid.style.border = "0.2vw solid black";
         grid.style.borderRadius = "1vw";
+        grid.style.fontSize = "XX-Large";
     }
     else {
         grid.style.border = "";
+        if (!landscape) {
+            grid.style.fontSize = "X-Large";
+        } else {
+            grid.style.fontSize = "small";
+        }
     }
     for (var i = 0; i < 6; i++) {
         for (var j = 0; j < 7; j++) {
