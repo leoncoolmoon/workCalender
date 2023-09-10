@@ -138,6 +138,7 @@ window.onload = function () {
     leftDiv.style.gridArea = "left";
     leftDiv.style.textAlign = "left";
     leftDiv.style.alignItems = "center";
+    leftDiv.style.display = "flex";
     leftDiv.style.verticalAlign = "middle";
     leftDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     topDiv.appendChild(leftDiv);
@@ -151,6 +152,7 @@ window.onload = function () {
     topDiv.appendChild(centerDiv);
     rightDiv = document.createElement("div");
     rightDiv.id = "rightDiv";
+    rightDiv.style.display = "flex";
     rightDiv.style.gridArea = "right";
     rightDiv.style.textAlign = "right";
     rightDiv.style.alignItems = "center";
