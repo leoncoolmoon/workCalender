@@ -872,6 +872,15 @@ function importRoster(file) {
                     alert(language.notCompatible);
                     return;
                 }
+            } else if (line.startsWith('DESCRIPTION:')) {
+                shift.note = line.substring(12);
+                //去掉第一行
+                var pos = shift.note.indexOf("-")
+                if (pos != -1) {
+                    shift.note = shift.note.substring(pos + 1);
+                } else {
+                    shift.note = "";
+                };
             }
         }
         generateCalendar(0);
@@ -1285,10 +1294,10 @@ function downloadRoster(shiftsA) {
             //now
             var created = new Date().toISOString();
             var note = "";
-            if(shift.note != undefined && shift.note != "") {
-                note = "\n" + shift.note;
+            if (shift.note != undefined && shift.note != "") {
+                note = "-" + shift.note;
             }
-            var valarm = creatVALARM(shiftType.trigger, shiftType.description+note, shiftType.audioFile, shiftType.uid);
+            var valarm = creatVALARM(shiftType.trigger, shiftType.description + note, shiftType.audioFile, shiftType.uid);
             if (valarm != "") {//不带提醒的班次不导出
                 vevents.push(createVEvent(start, end, shiftType.summary, created, valarm));
             }
