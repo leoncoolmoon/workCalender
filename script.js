@@ -224,6 +224,7 @@ window.onload = function () {
             operateBoxDiv.style.display = "none";
             selectedDate.style.border = "";
             centerDiv.innerHTML = "";
+            pushNotes(selectedDateD.toISOString(), document.getElementById("shiftNote").value);
         }
     });
     //---------------------------------------------------------
@@ -247,7 +248,7 @@ window.onload = function () {
     shiftTypeListDiv.style.left = "0px";
     shiftTypeListDiv.style.width = "inherit";
     shiftTypeListDiv.style.overflowY = "auto";
-    shiftTypeListDiv.style.height = "85%";
+    shiftTypeListDiv.style.height = "75%";
     shiftEditerDiv.appendChild(shiftTypeListDiv);
 
     //addShiftTypeDiv, removeShiftTypeBt, editShiftTypeBt;
@@ -256,19 +257,50 @@ window.onload = function () {
     } else {
         loadShiftType();
     }
-    shiftBtDiv = document.createElement("div");
-    // shiftBtDiv.id = "shiftBtDiv";  
-    shiftBtDiv.style.display = "flex";
-    shiftBtDiv.style.position = "absolute";
-    shiftBtDiv.style.bottom = "0";
-    shiftBtDiv.style.justifyContent = "space-around";
+    var shiftInfoDiv = document.createElement("div");
+    // shiftInfoDiv.id = "shiftInfoDiv";  
+    shiftInfoDiv.style.display = "block";
+    shiftInfoDiv.style.position = "absolute";
+    shiftInfoDiv.style.bottom = "0";
+    //shiftInfoDiv.style.justifyContent = "space-around";
     //最小高度为5vh
+    shiftInfoDiv.style.minHeight = "20vh";
+    // shiftInfoDiv.style.justifyContent = "space-around";
+    // shiftInfoDiv.style.alignItems = "center";
+    shiftInfoDiv.style.width = "100%";
+    // shiftInfoDiv.style.height = "10%";
+    shiftEditerDiv.appendChild(shiftInfoDiv);
+    var shiftBtDiv = shiftInfoDiv.cloneNode(true);
+    var shiftNoteDiv = shiftInfoDiv.cloneNode(true);
+    shiftBtDiv.style.display = "flex";
+    shiftBtDiv.style.justifyContent = "space-around";
     shiftBtDiv.style.minHeight = "5vh";
-    // shiftBtDiv.style.justifyContent = "space-around";
-    // shiftBtDiv.style.alignItems = "center";
-    shiftBtDiv.style.width = "100%";
-    // shiftBtDiv.style.height = "10%";
-    shiftEditerDiv.appendChild(shiftBtDiv);
+    shiftBtDiv.style.top = "0";
+    shiftBtDiv.style.bottom = "auto";
+    shiftNoteDiv.style.top = "auto";
+    shiftNoteDiv.style.minHeight = "10vh";
+    shiftNoteDiv.style.display = "flex";
+    shiftNoteDiv.style.justifyContent = "space-around";
+    shiftInfoDiv.appendChild(shiftBtDiv);
+    shiftInfoDiv.appendChild(shiftNoteDiv);
+    var shiftNote = document.createElement("textarea");
+    var shiftNoteLabel = document.createElement("div");
+    shiftNoteLabel.innerHTML = language.description;
+    shiftNoteLabel.style.textAlign = "right";
+    shiftNoteLabel.style.alignItems = "center";
+    shiftNoteLabel.style.verticalAlign = "middle";
+    shiftNoteLabel.style.paddingLeft = "1.5vw";
+    shiftNoteLabel.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    shiftNoteLabel.style.fontSize = "5vh";
+    shiftNoteLabel.style.display = "inline-block";
+    shiftNoteLabel.style.width = "15%";
+    shiftNoteLabel.style.height = "auto";
+    shiftNoteLabel.style.lineHeight = "10vh";
+    shiftNoteDiv.appendChild(shiftNoteLabel);
+    shiftNote.id = "shiftNote";
+    shiftNote.style.width = "80%";
+    // shiftNote.type = "text";
+    shiftNoteDiv.appendChild(shiftNote);
 
     //添加班次类型按钮构造
     addShiftTypeBt = document.createElement("button");
@@ -304,6 +336,7 @@ window.onload = function () {
         selectedDate.style.border = "";
         operateBoxDiv.style.display = "none";
         centerDiv.innerHTML = "";
+        document.getElementById("shiftNote").value = "";
     });
     shiftBtDiv.appendChild(clearShiftBt);
 
@@ -517,6 +550,17 @@ function clearForm() {
     document.getElementById("color").value = "#ff0000";
     document.getElementById("contentDiv").dataset.id = undefined;
 }
+function pushNotes(date, note) {
+    var existShift = shifts.find(shift => shift.date == date);
+    if (existShift == undefined) {
+        shifts.push({ date: date, uid: "", note: note });
+        //downloaded = false;
+    } else {
+        existShift.note = note;
+        downloaded = false;
+    }
+}
+
 function loadShiftType() {
 
     shiftTypeListDiv.innerHTML = "";
@@ -547,7 +591,7 @@ function loadShiftType() {
                 var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
                 //TODO:赋予当前选择日期当前的班次类型
                 if (existShift == undefined) {
-                    shifts.push({ date: selectedDateD.toISOString(), uid: this.id });
+                    shifts.push({ date: selectedDateD.toISOString(), uid: this.id, note: document.getElementById("shiftNote").value });
                     downloaded = false;
                 } else {
                     existShift.uid = this.id;
@@ -555,6 +599,7 @@ function loadShiftType() {
                 selectedDate.style.backgroundColor = this.style.backgroundColor;
                 selectedDate.style.border = "";
                 operateBoxDiv.style.display = "none";
+                document.getElementById("shiftNote").value = "";
                 centerDiv.innerHTML = "";
             }
         });
@@ -606,22 +651,22 @@ function adjustUI() {
     var availableRatio = [2 / 6, 3 / 4, 4 / 3, 6 / 2];
     //移动div到中间
     // operateDiv.style.transform = "translate(-50%,-50%)";
-  /*  var grid = document.getElementsByClassName("grid-container");
-
-    if (grid != null) {
-        if (displayMonthMode) {
-            grid.style.border = "0.2vw solid black";
-            grid.style.borderRadius = "1vw";
-            grid.style.fontSize = "XX-Large";
-        } else {
-            if (landscape) {
-                grid.style.fontSize = "small";
-            } else {
-                grid.style.fontSize = "X-Large";
-            }
-        }
-    }
-*/
+    /*  var grid = document.getElementsByClassName("grid-container");
+  
+      if (grid != null) {
+          if (displayMonthMode) {
+              grid.style.border = "0.2vw solid black";
+              grid.style.borderRadius = "1vw";
+              grid.style.fontSize = "XX-Large";
+          } else {
+              if (landscape) {
+                  grid.style.fontSize = "small";
+              } else {
+                  grid.style.fontSize = "X-Large";
+              }
+          }
+      }
+  */
     if (whRatio < (availableRatio[0] + availableRatio[1]) / 2) {
         //2/6
         setGrid(2, 6);
@@ -924,6 +969,7 @@ function generateMonth(year, month, container) {
         var cell = document.createElement("div");
         cell.className = "grid-item";
         cell.innerHTML = language.weekNames[j];
+        if (j == 5 || j == 6) cell.classList.add("weekend");
         if (displayMonthMode) {
             cell.style.height = monthModeHeight;
             //cell.style.fontSize = "3em";
@@ -932,7 +978,7 @@ function generateMonth(year, month, container) {
             // cell.style.fontSize = "1.5em";
         }
         cell.style.height = displayMonthMode ? monthModeHeight : "inherit";
-        cell.classList.add("weekend");
+        //cell.classList.add("weekend");
         grid.appendChild(cell);
     }
     if (displayMonthMode) {
@@ -959,6 +1005,11 @@ function generateMonth(year, month, container) {
                     selectedDate.style.border = "0.2vw solid black";
                     centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
                     selectedDateD = new Date(year, month, parseInt(selectedDate.innerHTML));
+                    document.getElementById("shiftNote").value = "";
+                    var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
+                    if (existShift != undefined && existShift != -1) {
+                        document.getElementById("shiftNote").value = existShift.note;
+                    }
                 });
                 cell.style.height = monthModeHeight;
                 //cell.style.fontSize = "3em";
@@ -973,9 +1024,16 @@ function generateMonth(year, month, container) {
             } else {
                 var d = new Date(year, month, date).toISOString().substring(0, 10);
                 var n = [...oldShifts, ...shifts].find(shift => shift.date.substring(0, 10) === d);
-                var s = n != undefined ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
-                cell.style.backgroundColor = s != undefined ? s.color : "";
-                cell.innerHTML = date;
+                var s = (n != undefined && n != -1) ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
+                cell.style.backgroundColor = (s != undefined && s != -1) ? s.color : "";
+                // if(date == 16) {
+                //     cell.style.color = "red";
+                // }
+                if (displayMonthMode && n != undefined && n != -1 && n.note != undefined && n.note != "") {
+                    cell.innerHTML = date + "<br>" + n.note;
+                } else {
+                    cell.innerHTML = date;
+                }
                 if (j === 5 || j === 6) {
                     cell.classList.add("weekend");
                 }
@@ -1219,15 +1277,21 @@ function downloadRoster(shiftsA) {
     var vevents = [];
     shiftsA.forEach(shift => {
         var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
-        //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
-        var start = addTime(shift.date, shiftType.start);
-        var end = addTime(shift.date, shiftType.end);
-        var t = typeof (shiftType.start);
-        //now
-        var created = new Date().toISOString();
-        var valarm = creatVALARM(shiftType.trigger, shiftType.description, shiftType.audioFile, shiftType.uid);
-        if (valarm != "") {//不带提醒的班次不导出
-            vevents.push(createVEvent(start, end, shiftType.summary, created, valarm));
+        if (shiftType != undefined && shiftType != -1) {
+            //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
+            var start = addTime(shift.date, shiftType.start);
+            var end = addTime(shift.date, shiftType.end);
+            var t = typeof (shiftType.start);
+            //now
+            var created = new Date().toISOString();
+            var note = "";
+            if(shift.note != undefined && shift.note != "") {
+                note = "\n" + shift.note;
+            }
+            var valarm = creatVALARM(shiftType.trigger, shiftType.description+note, shiftType.audioFile, shiftType.uid);
+            if (valarm != "") {//不带提醒的班次不导出
+                vevents.push(createVEvent(start, end, shiftType.summary, created, valarm));
+            }
         }
     });
     var vcalendar = createVCalendar(vevents);
