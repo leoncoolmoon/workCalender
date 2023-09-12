@@ -153,8 +153,9 @@ window.onload = function () {
     centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     centerDiv.addEventListener("click", function (event) {
         //click to input date
+        var inputDate = null;
         if (event.target.id == "centerDiv" && centerDiv.innerHTML.length <5) {
-           var inputDate = document.createElement("input");
+            inputDate = document.createElement("input");
             inputDate.type = "date";
             inputDate.style.display = "block";
             inputDate.style.marginLeft = "1vw";
@@ -169,6 +170,7 @@ window.onload = function () {
            
         }else{
             inputDate.style.display = "none";
+            inputDate.remove();
         }
     });
     centerDiv.style.display = "flex";
