@@ -154,7 +154,7 @@ window.onload = function () {
     centerDiv.addEventListener("click", function (event) {
         //click to input date
         var inputDate = null;
-        if (event.target.id == "centerDiv" && centerDiv.innerHTML.length <5) {
+        if (event.target.id == "centerDiv" && centerDiv.innerHTML.length < 5) {
             inputDate = document.createElement("input");
             inputDate.type = "date";
             inputDate.style.display = "block";
@@ -167,30 +167,30 @@ window.onload = function () {
                 inputDate.remove();
             });
             centerDiv.appendChild(inputDate);
-           
-        }else{
+
+        } else {
             inputDate.style.display = "none";
             inputDate.remove();
         }
     });
     centerDiv.style.display = "flex";
 
-centerDiv.addEventListener("contextmenu", function (event) {
-    //跳转到今天
-    event.preventDefault();
-    if (event.target.id == "centerDiv") {
-        var date = new Date();
-        year = date.getFullYear();
-        generateCalendar(date.getMonth() + 1);
-        var day = date.getDate();
-        var days = document.getElementsByClassName("grid-item");
-        for (var i = 0; i < days.length; i++) {
-            if (days[i].dataset.day == day) {
-                days[i].style.border = "0.2vw solid black";
+    centerDiv.addEventListener("contextmenu", function (event) {
+        //跳转到今天
+        event.preventDefault();
+        if (event.target.id == "centerDiv") {
+            var date = new Date();
+            year = date.getFullYear();
+            generateCalendar(date.getMonth() + 1);
+            var day = date.getDate();
+            var days = document.getElementsByClassName("grid-item");
+            for (var i = 0; i < days.length; i++) {
+                if (days[i].dataset.day == day) {
+                    days[i].style.border = "0.2vw solid black";
+                }
             }
         }
-    }
-});
+    });
 
     topDiv.appendChild(centerDiv);
     rightDiv = document.createElement("div");
@@ -217,13 +217,15 @@ centerDiv.addEventListener("contextmenu", function (event) {
     middleDiv.style.left = "0";
     middleDiv.style.top = "5vh";
     middleDiv.style.position = "relative";
+    middleDiv.style.overflowY = "scroll";
+    middleDiv.style.height = "88vh";
     document.body.appendChild(middleDiv);
     //用来展示日历的div
     calendarDiv = document.createElement("div");
     calendarDiv.id = "calendarDiv";
     calendarDiv.style.display = "block";
-    calendarDiv.style.height = "93vh";
-    calendarDiv.style.width = "98vw";
+    calendarDiv.style.height = "80vh";
+    calendarDiv.style.width = "auto";
     calendarDiv.style.top = "0";
     calendarDiv.style.left = "0";
     calendarDiv.addEventListener("click", function (event) {
@@ -1410,7 +1412,7 @@ function loadRoster() {
     }
 }
 
-function countShifts(year, month, shiftCountDiv){
+function countShifts(year, month, shiftCountDiv) {
     shiftCountDiv.style.position = "absolute";
     shiftCountDiv.style.bottom = "0";
     shiftCountDiv.style.left = "0";
@@ -1419,6 +1421,7 @@ function countShifts(year, month, shiftCountDiv){
     shiftCountDiv.style.textShadow = "#878787 1em 1em 0.5em";
     shiftCountDiv.style.paddingRight = "5vw";
     // shiftCountDiv.style.paddingLeft = "5vw";
+    shiftCountDiv.style.height = "5vh";
     shiftCountDiv.style.display = "flex";
     shiftCountDiv.style.textAlign = "center";
     shiftCountDiv.style.alignItems = "center";
@@ -1429,26 +1432,26 @@ function countShifts(year, month, shiftCountDiv){
     // box-shadow: rgb(0 0 0 / 75%) 0 1vh 1vh;
     shiftCountDiv.style.boxShadow = "rgb(0 0 0 / 75%) 0 -1vh 1vh";
     var knownShifts = [...oldShifts, ...shifts];
-    if(month ==0){//count year shifts count by different shiftType
-        shiftTypeTable. forEach(shiftType =>{
+    if (month == 0) {//count year shifts count by different shiftType
+        shiftTypeTable.forEach(shiftType => {
             var shiftCount = 0;
-            knownShifts.forEach(shift =>{
-                if(shift.uid == shiftType.uid && shift.date.substring(0,4) == year){
+            knownShifts.forEach(shift => {
+                if (shift.uid == shiftType.uid && shift.date.substring(0, 4) == year) {
                     shiftCount++;
                 }
             });
-            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: "+shiftType.color+";padding-right: 2em;'>"+shiftType.summary + ":" + shiftCount+" </span>";
+            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: " + shiftType.color + ";padding-right: 2em;'>" + shiftType.summary + ":" + shiftCount + " </span>";
         });
-    }else if(month >0 && month <=12){//count month shifts count by different shiftType
-        shiftTypeTable.forEach(shiftType =>{
+    } else if (month > 0 && month <= 12) {//count month shifts count by different shiftType
+        shiftTypeTable.forEach(shiftType => {
             var shiftCount = 0;
-            knownShifts.forEach(shift =>{
-                if(shift.uid == shiftType.uid && shift.date.substring(0,7) == year + "-" + doubleNum(month)){
+            knownShifts.forEach(shift => {
+                if (shift.uid == shiftType.uid && shift.date.substring(0, 7) == year + "-" + doubleNum(month)) {
                     shiftCount++;
                 }
             });
             //把这个div置页面底部，顶层
-            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: "+shiftType.color+";padding-right: 2em;'>"+shiftType.summary + ":" + shiftCount+" </span>";
+            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: " + shiftType.color + ";padding-right: 2em;'>" + shiftType.summary + ":" + shiftCount + " </span>";
         });
     }
 }
