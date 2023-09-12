@@ -151,6 +151,45 @@ window.onload = function () {
     centerDiv.style.verticalAlign = "middle";
     centerDiv.style.width = "max-content";
     centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
+    centerDiv.addEventListener("click", function (event) {
+        //click to input date
+        if (event.target.id == "centerDiv" && centerDiv.innerHTML.length <5) {
+           var inputDate = document.createElement("input");
+            inputDate.type = "date";
+            inputDate.style.display = "block";
+            inputDate.style.marginLeft = "1vw";
+            inputDate.focus();
+            inputDate.addEventListener("change", function (event) {
+                var date = new Date(event.target.value);
+                year = date.getFullYear();
+                generateCalendar(date.getMonth() + 1);
+                inputDate.remove();
+            });
+            centerDiv.appendChild(inputDate);
+           
+        }else{
+            inputDate.style.display = "none";
+        }
+    });
+    centerDiv.style.display = "flex";
+
+centerDiv.addEventListener("contextmenu", function (event) {
+    //跳转到今天
+    event.preventDefault();
+    if (event.target.id == "centerDiv") {
+        var date = new Date();
+        year = date.getFullYear();
+        generateCalendar(date.getMonth() + 1);
+        var day = date.getDate();
+        var days = document.getElementsByClassName("grid-item");
+        for (var i = 0; i < days.length; i++) {
+            if (days[i].dataset.day == day) {
+                days[i].style.border = "0.2vw solid black";
+            }
+        }
+    }
+});
+
     topDiv.appendChild(centerDiv);
     rightDiv = document.createElement("div");
     rightDiv.id = "rightDiv";
@@ -529,7 +568,9 @@ window.onload = function () {
     bottomDiv.appendChild(save);
     operateDiv.appendChild(shiftTypeEditBoxDiv);
 
-
+    var countShiftDiv = document.createElement("div");
+    countShiftDiv.id = "countShiftDiv";
+    document.body.appendChild(countShiftDiv);
 
     //----------------------------------------------------------------
     //用来展示班次类别的div
@@ -815,7 +856,7 @@ function generateCalendar(displayM) {
 
     leftDiv.appendChild(importButton);
     adjustUI();
-
+    countShifts(year, displayM, document.getElementById("countShiftDiv"));
 }
 //拖放文件到浏览器窗口
 
@@ -1035,6 +1076,7 @@ function generateMonth(year, month, container) {
                 var n = [...oldShifts, ...shifts].find(shift => shift.date.substring(0, 10) === d);
                 var s = (n != undefined && n != -1) ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
                 cell.style.backgroundColor = (s != undefined && s != -1) ? s.color : "";
+                cell.dataset.day = date;
                 // if(date == 16) {
                 //     cell.style.color = "red";
                 // }
@@ -1365,3 +1407,47 @@ function loadRoster() {
         shiftTypeTable = JSON.parse(shiftTypeString);
     }
 }
+
+function countShifts(year, month, shiftCountDiv){
+    shiftCountDiv.style.position = "absolute";
+    shiftCountDiv.style.bottom = "0";
+    shiftCountDiv.style.left = "0";
+    shiftCountDiv.style.zIndex = "120";
+    shiftCountDiv.style.fontSize = "1.5em";
+    shiftCountDiv.style.textShadow = "#878787 1em 1em 0.5em";
+    shiftCountDiv.style.paddingRight = "5vw";
+    // shiftCountDiv.style.paddingLeft = "5vw";
+    shiftCountDiv.style.display = "flex";
+    shiftCountDiv.style.textAlign = "center";
+    shiftCountDiv.style.alignItems = "center";
+    shiftCountDiv.style.verticalAlign = "middle";
+    shiftCountDiv.style.justifyContent = "space-between";
+    shiftCountDiv.style.width = "-webkit-fill-available";
+    shiftCountDiv.innerHTML = "";
+    // box-shadow: rgb(0 0 0 / 75%) 0 1vh 1vh;
+    shiftCountDiv.style.boxShadow = "rgb(0 0 0 / 75%) 0 -1vh 1vh";
+    var knownShifts = [...oldShifts, ...shifts];
+    if(month ==0){//count year shifts count by different shiftType
+        shiftTypeTable. forEach(shiftType =>{
+            var shiftCount = 0;
+            knownShifts.forEach(shift =>{
+                if(shift.uid == shiftType.uid && shift.date.substring(0,4) == year){
+                    shiftCount++;
+                }
+            });
+            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: "+shiftType.color+";padding-right: 2em;'>"+shiftType.summary + ":" + shiftCount+" </span>";
+        });
+    }else if(month >0 && month <=12){//count month shifts count by different shiftType
+        shiftTypeTable.forEach(shiftType =>{
+            var shiftCount = 0;
+            knownShifts.forEach(shift =>{
+                if(shift.uid == shiftType.uid && shift.date.substring(0,7) == year + "-" + doubleNum(month)){
+                    shiftCount++;
+                }
+            });
+            //把这个div置页面底部，顶层
+            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: "+shiftType.color+";padding-right: 2em;'>"+shiftType.summary + ":" + shiftCount+" </span>";
+        });
+    }
+}
+
