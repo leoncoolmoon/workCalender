@@ -73,7 +73,6 @@ var languages = {
 };
 
 var selectAbleTimesValue = ["", "-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
-
 var shifts = [];//班表
 var oldShifts = [];//旧班表
 var shiftTypeTable = [];//存放可选的shift类型
@@ -91,8 +90,9 @@ var calendarDiv, operateDiv, operateBoxDiv, topDiv, middleDiv, shiftEditerDiv, s
 var shiftTypeListDiv;
 var addShiftTypeBt, clearShiftBt, removeShiftTypeBt, editShiftTypeBt;
 var leftDiv, centerDiv, rightDiv;
+var multipleSelectMode = false;
+var multiSelectedDates = [];
 var selectedDate = null;
-var selectedDateD = null;
 var cMonth = null;
 
 var date = new Date();
@@ -160,17 +160,26 @@ window.onload = function () {
             inputDate.style.display = "block";
             inputDate.style.marginLeft = "1vw";
             inputDate.focus();
-            inputDate.addEventListener("change", function (event) {
+            inputDate.addEventListener("blur", function (event) {
                 var date = new Date(event.target.value);
                 year = date.getFullYear();
                 generateCalendar(date.getMonth() + 1);
+                var day = date.toISOString();
+                var days = document.getElementsByClassName("grid-item");
+                for (var i = 0; i < days.length; i++) {
+                    if (days[i].dataset.day == day) {
+                        days[i].style.border = "0.2vw solid black";
+                    }
+                }
                 inputDate.remove();
             });
             centerDiv.appendChild(inputDate);
 
         } else {
-            inputDate.style.display = "none";
-            inputDate.remove();
+            if (inputDate != null) {
+                inputDate.style.display = "none";
+                inputDate.remove();
+            }
         }
     });
     centerDiv.style.display = "flex";
@@ -182,7 +191,7 @@ window.onload = function () {
             var date = new Date();
             year = date.getFullYear();
             generateCalendar(date.getMonth() + 1);
-            var day = date.getDate();
+            var day = date.toISOString();
             var days = document.getElementsByClassName("grid-item");
             for (var i = 0; i < days.length; i++) {
                 if (days[i].dataset.day == day) {
@@ -204,10 +213,6 @@ window.onload = function () {
     rightDiv.style.paddingRight = "0.5vw";
     rightDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
     topDiv.appendChild(rightDiv);
-
-
-
-
 
     document.body.appendChild(topDiv);
     //用来展示日历和操作的div
@@ -263,11 +268,23 @@ window.onload = function () {
     operateDiv.style.transform = "translate(17.5%, 17.5%)";
     operateBoxDiv.appendChild(operateDiv);
     operateBoxDiv.addEventListener("click", function (event) {
-        if (event.target.id == "operateBoxDiv") {
+        if (event.target.id == "operateBoxDiv") {//canceled shift edit but still can push notes to selected date
             operateBoxDiv.style.display = "none";
-            selectedDate.style.border = "";
             centerDiv.innerHTML = "";
-            pushNotes(selectedDateD.toISOString(), document.getElementById("shiftNote").value);
+            var note = document.getElementById("shiftNote").value;
+            if (multiSelectedDates.length == 0) {
+                selectedDate.style.border = "";
+                pushNotes(selectedDate.dataset.day, note);
+            } else {
+                //push each line of the shiftNote into each date
+                var notes = note.split("\n");
+                for (var i = 0; i < multiSelectedDates.length; i++) {
+                    multiSelectedDates[i].style.border = "";
+                    pushNotes(multiSelectedDates[i], i < notes.length ? notes[i] : "");
+                }
+                multiSelectedDates = [];
+            }
+            document.getElementById("shiftNote").value = "";
         }
     });
     //---------------------------------------------------------
@@ -373,13 +390,25 @@ window.onload = function () {
     clearShiftBt.id = "clearShiftBt";
     clearShiftBt.innerHTML = language.clearShift;
     clearShiftBt.addEventListener("click", function (event) {
-        //清空当天班次
-        shifts.splice(shifts.findIndex(shift => shift.date == selectedDateD), 1);
-        selectedDate.style.backgroundColor = "";
-        selectedDate.style.border = "";
         operateBoxDiv.style.display = "none";
-        centerDiv.innerHTML = "";
         document.getElementById("shiftNote").value = "";
+        centerDiv.innerHTML = "";
+        if (multiSelectedDates.length == 0) {
+            //清空当天班次
+            selectedDate.style.backgroundColor = "";
+            selectedDate.style.border = "";
+            shifts.splice(shifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
+            oldShifts.splice(oldShifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
+        } else {
+            multiSelectedDates.forEach(date => {
+                date.style.backgroundColor = "";
+                date.style.border = "";
+                shifts.splice(shifts.findIndex(shift => shift.date == date.dataset.day), 1);
+                oldShifts.splice(oldShifts.findIndex(shift => shift.date == date.dataset.day), 1);
+            });
+            multiSelectedDates = [];
+        }
+        countShifts(year, cMonth + 1, document.getElementById("countShiftDiv"));
     });
     shiftBtDiv.appendChild(clearShiftBt);
 
@@ -597,12 +626,16 @@ function clearForm() {
 }
 function pushNotes(date, note) {
     var existShift = shifts.find(shift => shift.date == date);
-    if (existShift == undefined) {
-        shifts.push({ date: date, uid: "", note: note });
-        //downloaded = false;
-    } else {
+    if (existShift == undefined) {//如果不存在则检测老班表
+        var existOldShift = oldShifts.find(shift => shift.date == date);
+        if (existOldShift != undefined) {//如果存在则把老班表的班次类型赋予当前选择日期
+            shifts.push({ date: date, uid: existOldShift.uid, note: note });
+            oldShifts.splice(oldShifts.findIndex(shift => shift.date == date), 1);
+        }else{//如果不存在则添加新的班次类型
+            shifts.push({ date: date, uid: "", note: note });
+        }
+    } else {//如果存在则更新note
         existShift.note = note;
-        downloaded = false;
     }
 }
 
@@ -632,20 +665,44 @@ function loadShiftType() {
 
         shiftType.addEventListener("click", function (event) {
             if (event.target.id == this.id) {
-                //赋予当前选择日期当前的班次类型
-                var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
-                //TODO:赋予当前选择日期当前的班次类型
-                if (existShift == undefined) {
-                    shifts.push({ date: selectedDateD.toISOString(), uid: this.id, note: document.getElementById("shiftNote").value });
-                    downloaded = false;
+                var note = document.getElementById("shiftNote").value;
+                if (multiSelectedDates.length == 0) {
+                    //赋予当前选择日期当前的班次类型
+                    var existShift = shifts.find(shift => shift.date == selectedDate.dataset.day);
+                    //TODO:赋予当前选择日期当前的班次类型
+                    if (existShift == undefined) {
+                        shifts.push({ date: selectedDate.dataset.day, uid: this.id, note: note });
+                        downloaded = false;
+                        oldShifts.splice(oldShifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
+                    } else {
+                        existShift.uid = this.id;
+                        existShift.note = note;
+                    }
+                    selectedDate.style.backgroundColor = this.style.backgroundColor;
+                    selectedDate.style.border = "";
+
                 } else {
-                    existShift.uid = this.id;
+                    //赋予当前选择日期当前的班次类型
+                    var notes = note.split("\n");
+                    for (var i = 0; i < multiSelectedDates.length; i++) {
+                        var existShift = shifts.find(shift => shift.date == multiSelectedDates[i].dataset.day);
+                        if (existShift == undefined) {
+                            shifts.push({ date: multiSelectedDates[i].dataset.day, uid: this.id, note: i < notes.length ? notes[i] : "" });
+                            downloaded = false;
+                            oldShifts.splice(oldShifts.findIndex(shift => shift.date == multiSelectedDates[i].dataset.day), 1);
+                        } else {
+                            existShift.uid = this.id;
+                            existShift.note = i < notes.length ? notes[i] : "";
+                        }
+                        multiSelectedDates[i].style.backgroundColor = this.style.backgroundColor;
+                        multiSelectedDates[i].style.border = "";
+                    }
+                    multiSelectedDates = [];
                 }
-                selectedDate.style.backgroundColor = this.style.backgroundColor;
-                selectedDate.style.border = "";
                 operateBoxDiv.style.display = "none";
                 document.getElementById("shiftNote").value = "";
                 centerDiv.innerHTML = "";
+                countShifts(year, cMonth + 1, document.getElementById("countShiftDiv"));
             }
         });
         //编辑当前的班次类型,或者删除当前的班次类型 按钮构造
@@ -797,10 +854,24 @@ function generateCalendar(displayM) {
     var clearButton = downloadButton.cloneNode(true);
     var importButton = downloadButton.cloneNode(true);
     downloadButton.addEventListener("click", function (event) {//仅下载当前
-        downloadRoster(shifts);
+        if (displayMonthMode) {//下载当前月份
+            downloadRoster(shifts.filter(shift => {
+                var date = new Date(shift.Date);
+                return date.getUTCMonth() === cMonth;
+            }));
+        } else {//下载所有
+            downloadRoster(shifts);
+        }
     });
     downloadButton.addEventListener("dblclick", function (event) {//下载所有
-        downloadRoster([...oldShifts, ...shifts]);
+        if (displayMonthMode) {//下载当前月份
+            downloadRoster([...oldShifts, ...shifts].filter(shift => {
+                var date = new Date(shift.Date);
+                return date.getUTCMonth() === cMonth;
+            }));
+        } else {//下载所有
+            downloadRoster([...oldShifts, ...shifts]);
+        }
     });
     downloadButton.addEventListener("contextmenu", function (event) {//下载shiftType为json文件
         event.preventDefault();
@@ -812,13 +883,33 @@ function generateCalendar(displayM) {
     clearButton.id = "clearButton";
     clearButton.innerHTML = language.clearAll;
     clearButton.addEventListener("click", function (event) {//clear current
-        shifts = [];
-        generateCalendar(0);
+        if (displayMonthMode) { //clear current month  new shifts
+            shifts = shifts.filter(shift => {
+                var date = new Date(shift.Date);
+                return date.getUTCMonth() !== cMonth;
+            });
+            generateCalendar(cMonth + 1);
+        } else { //clear all new shifts
+            shifts = [];
+            generateCalendar(0);
+        }
     });
     clearButton.addEventListener("dblclick", function (event) {//all clear
-        shifts = [];
-        oldShifts = [];
-        generateCalendar(0);
+        if (displayMonthMode) { //clear current month old and new shifts
+            shifts = shifts.filter(shift => {
+                var date = new Date(shift.Date);
+                return date.getUTCMonth() !== cMonth;
+            });
+            oldShifts = oldShifts.filter(shift => {
+                var date = new Date(shift.Date);
+                return date.getUTCMonth() !== cMonth;
+            });
+            generateCalendar(cMonth + 1);
+        } else {// clear all old and new shifts
+            shifts = [];
+            oldShifts = [];
+            generateCalendar(0);
+        }
     });
     clearButton.addEventListener("contextmenu", function (event) {//shiftType as well
         event.preventDefault();
@@ -1054,17 +1145,70 @@ function generateMonth(year, month, container) {
             cell.className = "grid-item";
             if (displayMonthMode) {
                 cell.addEventListener("click", function (event) {
-                    operateBoxDiv.style.display = "block";
                     selectedDate = event.target;
                     selectedDate.style.border = "0.2vw solid black";
                     centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
-                    selectedDateD = new Date(year, month, parseInt(selectedDate.innerHTML));
-                    document.getElementById("shiftNote").value = "";
-                    var existShift = shifts.find(shift => shift.date == selectedDateD.toISOString());
-                    if (existShift != undefined && existShift != -1) {
-                        document.getElementById("shiftNote").value = existShift.note;
+                    if (!multipleSelectMode) {
+                        operateBoxDiv.style.display = "block";
+                        document.getElementById("shiftNote").value = "";
+                        var existShift = shifts.find(shift => shift.date == selectedDate.dataset.day);
+                        if (existShift != undefined && existShift != -1) {
+                            document.getElementById("shiftNote").value = existShift.note;
+                        }
+                    } else {
+                        var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
+                        if (f == undefined || f == -1) {
+                            multiSelectedDates.push(event.target);
+                        } else {
+                            multiSelectedDates = multiSelectedDates.filter(date => date.dataset.day != event.target.dataset.day);
+                            selectedDate.style.border = "";
+                        }
+                    }
+
+                });
+                cell.addEventListener("contextmenu", function (event) {
+                    //跳转到今天
+                    event.preventDefault();
+                    multipleSelectMode = !multipleSelectMode;
+                    //multiSelectedDates is a target array
+                    var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
+                    if (f == undefined || f == -1) {
+                        multiSelectedDates.push(event.target);
+                    }
+                    selectedDate = event.target;
+                    selectedDate.style.border = "0.2vw solid black";
+                    centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
+                    if (multipleSelectMode) {
+                        //start select
+                    } else {
+                        //finish select
+                        //action
+                        operateBoxDiv.style.display = "block";
+                        document.getElementById("shiftNote").value = "";
+                        multiSelectedDates.forEach(date => {
+                            var existShift = shifts.find(shift => shift.date == date.dataset.day);
+                            if (existShift != undefined && existShift != -1) {
+                                document.getElementById("shiftNote").value = document.getElementById("shiftNote").value + "\n" + existShift.note;
+                            }
+                        });
                     }
                 });
+                // //鼠标移动到日期上时如果时多选模式则选中此日期
+                // cell.addEventListener("mouseover", function (event) {
+                //     if (multipleSelectMode) {
+                //         selectedDate = event.target;
+                //         selectedDate.style.border = "0.2vw solid black";
+                //         centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
+                //         var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
+                //         if (f == undefined || f == -1) {
+                //             multiSelectedDates.push(event.target);
+                //         }else{
+                //             multiSelectedDates = multiSelectedDates.filter(date => date.dataset.day != event.target.dataset.day);
+                //             selectedDate.style.border = "";
+                //         }
+
+                //     }
+                // });
                 cell.style.height = monthModeHeight;
                 //cell.style.fontSize = "3em";
             } else {
@@ -1076,11 +1220,12 @@ function generateMonth(year, month, container) {
             } else if (date > daysInMonth) {
                 break;
             } else {
-                var d = new Date(year, month, date).toISOString().substring(0, 10);
-                var n = [...oldShifts, ...shifts].find(shift => shift.date.substring(0, 10) === d);
+                var d = new Date(year, month, date).toISOString();
+                var n = [...oldShifts, ...shifts].find(shift => shift.date === d);
                 var s = (n != undefined && n != -1) ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
                 cell.style.backgroundColor = (s != undefined && s != -1) ? s.color : "";
-                cell.dataset.day = date;
+                // dataset.day is a string
+                cell.dataset.day = d;
                 // if(date == 16) {
                 //     cell.style.color = "red";
                 // }
@@ -1349,6 +1494,9 @@ function downloadRoster(shiftsA) {
             }
         }
     });
+    if (vevents.length == 0) {
+        return;
+    }
     var vcalendar = createVCalendar(vevents);
     downloadVCalendar(vcalendar);
 }
