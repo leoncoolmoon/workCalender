@@ -159,6 +159,7 @@ window.onload = function () {
             inputDate.type = "date";
             inputDate.style.display = "block";
             inputDate.style.marginLeft = "1vw";
+            inputDate.value = new Date().toISOString().slice(0, 10);
             inputDate.focus();
             inputDate.addEventListener("blur", function (event) {
                 var date = new Date(event.target.value);
@@ -1564,8 +1565,8 @@ function countShifts(year, month, shiftCountDiv) {
     shiftCountDiv.style.position = "absolute";
     shiftCountDiv.style.bottom = "0";
     shiftCountDiv.style.left = "0";
-    shiftCountDiv.style.zIndex = "120";
-    shiftCountDiv.style.fontSize = "1.5em";
+    shiftCountDiv.style.zIndex = "90";
+    shiftCountDiv.style.fontSize = "12em";
     shiftCountDiv.style.textShadow = "#878787 1em 1em 0.5em";
     shiftCountDiv.style.paddingRight = "5vw";
     // shiftCountDiv.style.paddingLeft = "5vw";
