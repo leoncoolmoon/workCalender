@@ -1,1607 +1,604 @@
-var languages = {
-    en: {
-        "title": "Create an event",
-        "start": "Start",
-        "end": "End",
-        "summary": "Shift type",
-        "alarm": "Alarm time",
-        "description": "Description",
-        "create": "OK",
-        "cancel": "Cancel",
-        "clear": "Clear",
-        "clearAll": "Clear all shifts",
-        "import": "Import ICS file",
-        "notCompatible": "Your ICS file is incompatible with this app.",
-        "save": "Save",
-        "reminder": "Reminder",
-        "alarmAudio": "Alarm audio",
-        "alarmAudioNone": "None",
-        "alarmAudioDefault": "Default",
-        "selectShiftColor": "Custom color",
-        "shiftNotFound": "No such shift type",
-        "none": "None shift type",
-        "addShiftType": "Add shift type",
-        "clearShift": "Clear shift for this day",
-        "removeShiftType": "Remove shift type",
-        "editShiftType": "Edit shift type",
-        "add": "Add",
-        "remove": "Remove",
-        "edit": "Edit",
-        "selectAbleTimes": ["no alarm ", "5 minutes before", "10 minutes before", "15 minutes before", "20 minutes before", "30 minutes before", "45 minutes before", "1 hour before", "1.5 hours before", "2 hours before"],
-        "weekNames": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-        "openFile": "Open file",
-        "download": "Download roster",
-        "downloadNew": "Download updated roster"
-    },
-    zhCN: {
-        "title": "创建一个事件",
-        "start": "开始",
-        "end": "结束",
-        "summary": "班次类型",
-        "alarm": "闹铃时间",
-        "description": "描述",
-        "create": "确认",
-        "cancel": "取消",
-        "clear": "清空",
-        "clearAll": "清空所有班次",
-        "import": "导入ICS文件",
-        "notCompatible": "您的ICS文件与此应用不兼容。",
-        "save": "保存",
-        "reminder": "提醒",
-        "alarmAudio": "闹钟音频",
-        "alarmAudioNone": "无",
-        "alarmAudioDefault": "默认",
-        "selectShiftColor": "自定义颜色",
-        "shiftNotFound": "没有该shift类型",
-        "none": "没有班次类型",
-        "addShiftType": "添加班次类型",
-        "clearShift": "清空当天班次",
-        "editShiftType": "编辑班次类型",
-        "removeShiftType": "删除班次类型",
-        "add": "添加",
-        "remove": "删除",
-        "edit": "编辑",
-        "selectAbleTimes": ["无提醒", "提前5分钟", "提前10分钟", "提前15分钟", "提前20分钟", "提前30分钟", "提前45分钟", "提前1小时", "提前1个半小时", "提前2小时"],
-        "weekNames": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
-        "monthNames": ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
-        "openFile": "打开文件",
-        "download": "下载班表",
-        "downloadNew": "下载更新的班表"
+// ═══════════════════════════════════════════════════
+//  班表管理 v3  ·  app.js
+// ═══════════════════════════════════════════════════
+'use strict';
 
-    }
+const WEEK  = ['一','二','三','四','五','六','日'];
+const MONTH = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const PRESETS = [
+  {name:'早班',start:'07:00',end:'15:00',alarm:30,color:'#e8834f'},
+  {name:'中班',start:'11:00',end:'19:00',alarm:30,color:'#4fa6e8'},
+  {name:'晚班',start:'15:00',end:'23:00',alarm:30,color:'#9b5fe8'},
+  {name:'夜班',start:'23:00',end:'07:00',alarm:60,color:'#3a78d4'},
+  {name:'休息',start:'00:00',end:'00:00',alarm:0, color:'#4fbb7c'},
+  {name:'年假',start:'00:00',end:'00:00',alarm:0, color:'#e8c34f'},
+  {name:'培训',start:'09:00',end:'17:00',alarm:30,color:'#e85a5a'},
+  {name:'调休',start:'00:00',end:'00:00',alarm:0, color:'#6dbfa8'},
+];
+
+// ── State ──────────────────────────────────────────
+let shifts   = [];   // [{uid,name,start,end,alarm,color,desc}]
+let roster   = {};   // {'YYYY-MM-DD':{uid?,note?}}
+let yr       = new Date().getFullYear();
+let mo       = null; // null=year, 0-11=month
+let brush    = null; // selected shift uid
+let eraserOn = false;
+let selDates = new Set();
+let editUid  = null;
+let ctxKey   = null;
+let ptrDown  = false;
+let didDrag  = false;
+
+// ── Storage ────────────────────────────────────────
+const save = () => {
+  try { localStorage.setItem('wc3_shifts',JSON.stringify(shifts)); localStorage.setItem('wc3_roster',JSON.stringify(roster)); } catch(e){}
+};
+const load = () => {
+  try {
+    const s=localStorage.getItem('wc3_shifts'), r=localStorage.getItem('wc3_roster');
+    if(s) shifts=JSON.parse(s);
+    if(r) roster=JSON.parse(r);
+  } catch(e){}
 };
 
-var selectAbleTimesValue = ["", "-PT5M", "-PT10M", "-PT15M", "-PT20M", "-PT30M", "-PT45M", "-PT1H", "-PT1H30M", "-PT2H"];
-var shifts = [];//班表
-var oldShifts = [];//旧班表
-var shiftTypeTable = [];//存放可选的shift类型
-var downloaded = true;//是否已经下载了班表
-var audioFile = null;//alarm的音频文件
-var lang = (navigator.language || navigator.userLanguage).replace("-", "");
-var language = languages[lang] || languages.en;
-var monthModeHeight = "10vh";
-//var adjustHeight = "inherit";
-var displayMonthMode = false;
-var landscape = true;
-var oldLandscape = true;
-// 日历div，操作div，操作div的背景遮罩，顶部信息div，中间日历显示div，班次信息编辑用div，班次类型信息编辑用div
-var calendarDiv, operateDiv, operateBoxDiv, topDiv, middleDiv, shiftEditerDiv, shiftTypeEditBoxDiv;
-var shiftTypeListDiv;
-var addShiftTypeBt, clearShiftBt, removeShiftTypeBt, editShiftTypeBt;
-var leftDiv, centerDiv, rightDiv;
-var multipleSelectMode = false;
-var multiSelectedDates = [];
-var selectedDate = null;
-var cMonth = null;
+// ── Utils ──────────────────────────────────────────
+const genUid  = () => Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const dk      = (y,m,d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const todayK  = () => { const t=new Date(); return dk(t.getFullYear(),t.getMonth(),t.getDate()); };
+const byUid   = u => shifts.find(s=>s.uid===u);
+const get     = id => document.getElementById(id);
+const mk      = (tag,cls) => { const e=document.createElement(tag); if(cls)e.className=cls; return e; };
+const esc     = s => { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; };
+const TZ      = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Brisbane';
 
-var date = new Date();
-var year = date.getFullYear();
+const alarmV = min => {
+  min = Number(min);
+  if (min % 60 === 0) return `-PT${min/60}H`;
+  if (min > 60) return `-PT${Math.floor(min/60)}H${min%60}M`;
+  return `-PT${min}M`;
+};
 
-window.onresize = function () {
-    checkLandscape();
-    //if (oldLandscape != landscape) {
-    adjustUI();
-    //}
+// ── Eraser / Brush ────────────────────────────────
+function setEraser(on) {
+  eraserOn=on; if(on) brush=null;
+  get('eraserBtn').classList.toggle('on',eraserOn);
+  get('eraserIcon').textContent=eraserOn?'◼':'◻';
+  renderPalette();
 }
-//关闭前调用保存shifts和shifttable到cookie
-window.onbeforeunload = function () {
-    //保存shifts和shifttable到cookie
-    saveRoster();
-    if (shifts.length > 0 && !downloaded) {
-        downloadRoster(shifts);
+function setBrush(uid) {
+  if(eraserOn) setEraser(false);
+  brush=(brush===uid)?null:uid;
+  renderPalette();
+}
+
+// ── Palette ───────────────────────────────────────
+function renderPalette() {
+  const list=get('shiftList'); list.innerHTML='';
+  shifts.forEach(st=>{
+    const chip=mk('div','chip'+(st.uid===brush&&!eraserOn?' on':''));
+    chip.dataset.uid=st.uid;
+    chip.innerHTML=`
+      <div class="chip-dot" style="background:${st.color}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="chip-name">${esc(st.name)}</div>
+        <div class="chip-time">${st.start} – ${st.end}</div>
+      </div>
+      <div class="chip-acts">
+        <button class="chip-act ed" title="编辑">✏</button>
+        <button class="chip-act"    title="删除">✕</button>
+      </div>`;
+    chip.addEventListener('click',e=>{
+      if(e.target.closest('.chip-act.ed')){ openShiftModal(st.uid); return; }
+      if(e.target.closest('.chip-act'))   { removeShift(st.uid); return; }
+      setBrush(st.uid);
+    });
+    list.appendChild(chip);
+  });
+}
+
+function removeShift(u) {
+  if(!confirm('删除该班次类型？\n（已安排的日期不受影响）')) return;
+  shifts=shifts.filter(s=>s.uid!==u);
+  if(brush===u) brush=null;
+  save(); renderPalette(); renderCalendar();
+}
+
+// ── Shift Modal ───────────────────────────────────
+function openShiftModal(u) {
+  editUid=u||null; const st=u?byUid(u):null;
+  get('smTitle').textContent=st?'编辑班次':'添加班次';
+  get('fName').value  = st?st.name:'';
+  get('fStart').value = st?st.start:'08:00';
+  get('fEnd').value   = st?st.end:'16:00';
+  get('fAlarm').value = st?st.alarm:30;
+  get('fColor').value = st?st.color:'#4f8ef7';
+  get('fDesc').value  = st?st.desc:'';
+  buildTmpls();
+  get('shiftModal').classList.add('open');
+  setTimeout(()=>get('fName').focus(),40);
+}
+function closeShiftModal(){ get('shiftModal').classList.remove('open'); editUid=null; }
+function saveShiftModal(){
+  const name=get('fName').value.trim(); if(!name){get('fName').focus();return;}
+  const data={uid:editUid||genUid(),name,start:get('fStart').value,end:get('fEnd').value,
+              alarm:Number(get('fAlarm').value),color:get('fColor').value,desc:get('fDesc').value.trim()};
+  if(editUid){ const i=shifts.findIndex(s=>s.uid===editUid); if(i>=0)shifts[i]=data; }
+  else { shifts.push(data); brush=data.uid; eraserOn=false; }
+  save(); closeShiftModal(); renderPalette(); renderCalendar();
+}
+function buildTmpls(){
+  const el2=get('tmplList'); el2.innerHTML='<span style="font-size:10px;color:var(--text2)">预设：</span>';
+  PRESETS.forEach(t=>{
+    const b=mk('button','tmpl'); b.textContent=t.name;
+    b.onclick=()=>{ get('fName').value=t.name;get('fStart').value=t.start;
+      get('fEnd').value=t.end;get('fAlarm').value=t.alarm;get('fColor').value=t.color; };
+    el2.appendChild(b);
+  });
+}
+
+// ── Selection ─────────────────────────────────────
+function toggleSel(k,cell){
+  if(selDates.has(k)){selDates.delete(k);cell&&cell.classList.remove('sel');}
+  else{selDates.add(k);cell&&cell.classList.add('sel');}
+  updSelBar();
+}
+function addSel(k){
+  selDates.add(k);
+  document.querySelectorAll(`[data-key="${k}"]`).forEach(c=>c.classList.add('sel'));
+  updSelBar();
+}
+function updSelBar(){
+  const n=selDates.size; get('selCount').textContent=n;
+  get('selBar').classList.toggle('vis',n>0);
+}
+function deselectAll(){
+  selDates.clear();
+  document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
+  updSelBar();
+}
+function applyToSel(){
+  if(!brush){alert('请先在左侧选择班次类型');return;}
+  selDates.forEach(k=>paint(k));
+  deselectAll(); save(); renderCalendar();
+}
+function clearSel(){
+  selDates.forEach(k=>erase(k));
+  deselectAll(); save(); renderCalendar();
+}
+
+// ── Paint / Erase ─────────────────────────────────
+function paint(k){ if(!roster[k])roster[k]={}; roster[k].uid=brush; }
+function erase(k){ if(!roster[k])return; delete roster[k].uid; if(!roster[k].note)delete roster[k]; }
+
+// Live cell repaint (avoids full re-render during drag)
+function liveColor(cell, k) {
+  const ro=roster[k], st=ro&&ro.uid?byUid(ro.uid):null;
+  const big=cell.classList.contains('big');
+  if(st){
+    cell.style.background=st.color+(big?'cc':'bb');
+    cell.classList.add('painted');
+    if(big){
+      cell.style.borderColor='transparent';
+      const ns=cell.querySelector('.dc-shift');
+      if(ns) ns.textContent=st.name;
+      else { const n=mk('div','dc-shift'); n.textContent=st.name; cell.appendChild(n); }
     }
+  } else {
+    cell.style.background=''; cell.style.borderColor='';
+    cell.classList.remove('painted');
+    cell.querySelector('.dc-shift')&&cell.querySelector('.dc-shift').remove();
+  }
 }
 
+// ── Pointer Events (unified mouse + touch) ────────
+function initPointerDrag(container) {
+  let downKey=null;
 
-//初始化
-window.onload = function () {
-    checkLandscape();
-    //用来展示图例的div
-    //读取cookie
-    loadRoster();
-    topDiv = document.createElement("div");
-    topDiv.id = "topDiv";
-    topDiv.style.display = "grid";
+  container.addEventListener('pointerdown', e=>{
+    if(e.button!==0&&e.pointerType==='mouse') return;
+    const cell=e.target.closest('[data-key]'); if(!cell) return;
+    ptrDown=true; didDrag=false; downKey=cell.dataset.key;
+    container.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    // Act immediately on the start cell
+    const k=downKey;
+    if(eraserOn){ erase(k); liveColor(cell,k); }
+    else if(brush){ paint(k); liveColor(cell,k); addSel(k); }
+    // No-tool: selection is toggled on pointerup (so user can still drag-deselect)
+  });
 
-    topDiv.style.zIndex = "100";
-    topDiv.style.position = "fixed";
-    topDiv.style.top = "0";
-    topDiv.style.left = "0";
-    topDiv.style.width = "100vw";
-    topDiv.style.height = "5vh";
-    topDiv.style.gridTemplateColumns = "1fr 1fr 1fr";
-    topDiv.style.gridTemplateAreas = "'left center right'";
-    topDiv.style.justifyContent = "space-around";
-    leftDiv = document.createElement("div");
-    leftDiv.id = "leftDiv";
-    leftDiv.style.gridArea = "left";
-    leftDiv.style.textAlign = "left";
-    leftDiv.style.alignItems = "center";
-    leftDiv.style.display = "flex";
-    leftDiv.style.verticalAlign = "middle";
-    leftDiv.style.paddingLeft = "0.5vw";
-    leftDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    topDiv.appendChild(leftDiv);
-    centerDiv = document.createElement("div");
-    centerDiv.id = "centerDiv";
-    centerDiv.style.gridArea = "center";
-    centerDiv.style.textAlign = "center";
-    centerDiv.style.alignItems = "center";
-    centerDiv.style.verticalAlign = "middle";
-    centerDiv.style.width = "max-content";
-    centerDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    centerDiv.addEventListener("click", function (event) {
-        //click to input date
-        var inputDate = null;
-        if (event.target.id == "centerDiv" && centerDiv.innerHTML.length < 5) {
-            inputDate = document.createElement("input");
-            inputDate.type = "date";
-            inputDate.style.display = "block";
-            inputDate.style.marginLeft = "1vw";
-            inputDate.value = new Date().toISOString().slice(0, 10);
-            inputDate.focus();
-            inputDate.addEventListener("blur", function (event) {
-                var date = new Date(event.target.value);
-                year = date.getFullYear();
-                generateCalendar(date.getMonth() + 1);
-                var day = date.toISOString();
-                var days = document.getElementsByClassName("grid-item");
-                for (var i = 0; i < days.length; i++) {
-                    if (days[i].dataset.day == day) {
-                        days[i].style.border = "0.2vw solid black";
-                    }
-                }
-                inputDate.remove();
-            });
-            centerDiv.appendChild(inputDate);
+  container.addEventListener('pointermove', e=>{
+    if(!ptrDown) return;
+    const el=document.elementFromPoint(e.clientX,e.clientY);
+    const cell=el&&el.closest('[data-key]'); if(!cell) return;
+    const k=cell.dataset.key;
+    if(k===downKey) return; // still on origin cell — already handled by pointerdown
+    didDrag=true;           // we have left the origin cell: this is a real drag
+    if(eraserOn){ erase(k); liveColor(cell,k); }
+    else if(brush){ paint(k); liveColor(cell,k); addSel(k); }
+  });
 
-        } else {
-            if (inputDate != null) {
-                inputDate.style.display = "none";
-                inputDate.remove();
-            }
-        }
-    });
-    centerDiv.style.display = "flex";
-
-    centerDiv.addEventListener("contextmenu", function (event) {
-        //跳转到今天
-        event.preventDefault();
-        if (event.target.id == "centerDiv") {
-            var date = new Date();
-            year = date.getFullYear();
-            generateCalendar(date.getMonth() + 1);
-            var day = date.toISOString();
-            var days = document.getElementsByClassName("grid-item");
-            for (var i = 0; i < days.length; i++) {
-                if (days[i].dataset.day == day) {
-                    days[i].style.border = "0.2vw solid black";
-                }
-            }
-        }
-    });
-
-    topDiv.appendChild(centerDiv);
-    rightDiv = document.createElement("div");
-    rightDiv.id = "rightDiv";
-    rightDiv.style.display = "flex";
-    rightDiv.style.gridArea = "right";
-    rightDiv.style.textAlign = "right";
-    rightDiv.style.alignItems = "center";
-    rightDiv.style.justifyContent = "flex-end";
-    rightDiv.style.verticalAlign = "middle";
-    rightDiv.style.paddingRight = "0.5vw";
-    rightDiv.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    topDiv.appendChild(rightDiv);
-
-    document.body.appendChild(topDiv);
-    //用来展示日历和操作的div
-    middleDiv = document.createElement("div");
-    middleDiv.id = "middleDiv";
-    middleDiv.style.display = "block";
-    middleDiv.style.left = "0";
-    middleDiv.style.top = "5vh";
-    middleDiv.style.position = "relative";
-    middleDiv.style.overflowY = "scroll";
-    middleDiv.style.height = "88vh";
-    document.body.appendChild(middleDiv);
-    //用来展示日历的div
-    calendarDiv = document.createElement("div");
-    calendarDiv.id = "calendarDiv";
-    calendarDiv.style.display = "block";
-    calendarDiv.style.height = "80vh";
-    calendarDiv.style.width = "auto";
-    calendarDiv.style.top = "0";
-    calendarDiv.style.left = "0";
-    calendarDiv.addEventListener("click", function (event) {
-        if (event.target.id == "calendarDiv") {
-            generateCalendar(0);
-        }
-    });
-    middleDiv.appendChild(calendarDiv);
-    //用来展示操作的div
-    operateBoxDiv = document.createElement("div");
-    operateBoxDiv.id = "operateBoxDiv";
-    operateBoxDiv.style.display = "none";
-    operateBoxDiv.style.height = "100vh";
-    operateBoxDiv.style.width = "100vw";
-    operateBoxDiv.style.top = "5vh";
-    operateBoxDiv.style.left = "0";
-    operateBoxDiv.style.position = "fixed";
-    operateBoxDiv.style.zIndex = "99";
-    operateBoxDiv.style.backgroundColor = "rgba(20,20,20,0.5)";
-    middleDiv.appendChild(operateBoxDiv);
-    operateDiv = document.createElement("div");
-    operateDiv.id = "operateDiv";
-    operateDiv.style.display = "block";
-    operateDiv.style.position = "fixed";
-    operateDiv.style.zIndex = "100";
-    operateDiv.style.top = "0px";
-    operateDiv.style.left = "0px";
-    operateDiv.style.width = "70vw";
-    operateDiv.style.height = "70vh";
-    operateDiv.style.padding = "3vw";
-    // operateDiv.style.transformOrigin = "center";
-    //   border-radius: 1vw;box-shadow: rgb(0 0 0 / 75%) 2vw 2vh 2vh;
-    operateDiv.style.borderRadius = "1vw";
-    operateDiv.style.boxShadow = "rgb(0 0 0 / 75%) 2vw 2vh 2vh";
-    operateDiv.style.transform = "translate(17.5%, 17.5%)";
-    operateBoxDiv.appendChild(operateDiv);
-    operateBoxDiv.addEventListener("click", function (event) {
-        if (event.target.id == "operateBoxDiv") {//canceled shift edit but still can push notes to selected date
-            operateBoxDiv.style.display = "none";
-            centerDiv.innerHTML = "";
-            var note = document.getElementById("shiftNote").value;
-            if (multiSelectedDates.length == 0) {
-                selectedDate.style.border = "";
-                pushNotes(selectedDate.dataset.day, note);
-            } else {
-                //push each line of the shiftNote into each date
-                var notes = note.split("\n");
-                for (var i = 0; i < multiSelectedDates.length; i++) {
-                    multiSelectedDates[i].style.border = "";
-                    pushNotes(multiSelectedDates[i], i < notes.length ? notes[i] : "");
-                }
-                multiSelectedDates = [];
-            }
-            document.getElementById("shiftNote").value = "";
-        }
-    });
-    //---------------------------------------------------------
-    //构建班次信息编辑器
-    shiftEditerDiv = document.createElement("div");
-    shiftEditerDiv.id = "shiftEditerDiv";//用来编辑当日班次，列出所有班次类型，可以添加班次类型，删除班次类型，编辑班次类型
-    shiftEditerDiv.style.position = "fixed";
-    shiftEditerDiv.style.width = "inherit";
-    shiftEditerDiv.style.height = "90%";
-    shiftEditerDiv.style.display = " grid";
-    shiftEditerDiv.style.fontSize = "5vh";
-    shiftEditerDiv.style.textAlign = "center";
-    // shiftEditerDiv.style.alignItems = "center";
-
-    shiftTypeListDiv = document.createElement("div");
-    shiftTypeListDiv.id = "shiftTypeListDiv";//用来列出所有班次类型
-    // shiftTypeListDiv.style.display = "block";
-    // shiftTypeListDiv.style.position = "fixed";
-    // shiftTypeListDiv.style.zIndex = "100";
-    shiftTypeListDiv.style.top = "0px";
-    shiftTypeListDiv.style.left = "0px";
-    shiftTypeListDiv.style.width = "inherit";
-    shiftTypeListDiv.style.overflowY = "auto";
-    shiftTypeListDiv.style.height = "75%";
-    shiftEditerDiv.appendChild(shiftTypeListDiv);
-
-    //addShiftTypeDiv, removeShiftTypeBt, editShiftTypeBt;
-    if (shiftTypeTable === undefined) {
-        shiftEditerDiv.innerHTML = language.none;
+  container.addEventListener('pointerup', e=>{
+    if(!ptrDown) return;
+    ptrDown=false;
+    if(didDrag){
+      // Drag across multiple cells: save & re-render to sync state
+      save(); renderCalendar();
     } else {
-        loadShiftType();
-    }
-    var shiftInfoDiv = document.createElement("div");
-    // shiftInfoDiv.id = "shiftInfoDiv";  
-    shiftInfoDiv.style.display = "block";
-    shiftInfoDiv.style.position = "absolute";
-    shiftInfoDiv.style.bottom = "0";
-    //shiftInfoDiv.style.justifyContent = "space-around";
-    //最小高度为5vh
-    shiftInfoDiv.style.minHeight = "20vh";
-    // shiftInfoDiv.style.justifyContent = "space-around";
-    // shiftInfoDiv.style.alignItems = "center";
-    shiftInfoDiv.style.width = "100%";
-    // shiftInfoDiv.style.height = "10%";
-    shiftEditerDiv.appendChild(shiftInfoDiv);
-    var shiftBtDiv = shiftInfoDiv.cloneNode(true);
-    var shiftNoteDiv = shiftInfoDiv.cloneNode(true);
-    shiftBtDiv.style.display = "flex";
-    shiftBtDiv.style.justifyContent = "space-around";
-    shiftBtDiv.style.minHeight = "5vh";
-    shiftBtDiv.style.top = "0";
-    shiftBtDiv.style.bottom = "auto";
-    shiftNoteDiv.style.top = "auto";
-    shiftNoteDiv.style.minHeight = "10vh";
-    shiftNoteDiv.style.display = "flex";
-    shiftNoteDiv.style.justifyContent = "space-around";
-    shiftInfoDiv.appendChild(shiftBtDiv);
-    shiftInfoDiv.appendChild(shiftNoteDiv);
-    var shiftNote = document.createElement("textarea");
-    var shiftNoteLabel = document.createElement("div");
-    shiftNoteLabel.innerHTML = language.description;
-    shiftNoteLabel.style.textAlign = "right";
-    shiftNoteLabel.style.alignItems = "center";
-    shiftNoteLabel.style.verticalAlign = "middle";
-    shiftNoteLabel.style.paddingLeft = "1.5vw";
-    shiftNoteLabel.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    shiftNoteLabel.style.fontSize = "5vh";
-    shiftNoteLabel.style.display = "inline-block";
-    shiftNoteLabel.style.width = "15%";
-    shiftNoteLabel.style.height = "auto";
-    shiftNoteLabel.style.lineHeight = "10vh";
-    shiftNoteDiv.appendChild(shiftNoteLabel);
-    shiftNote.id = "shiftNote";
-    shiftNote.style.width = "80%";
-    // shiftNote.type = "text";
-    shiftNoteDiv.appendChild(shiftNote);
-
-    //添加班次类型按钮构造
-    addShiftTypeBt = document.createElement("button");
-    addShiftTypeBt.id = "addShiftTypeDiv";
-    addShiftTypeBt.innerHTML = language.addShiftType;
-    // addShiftTypeDiv.style.backgroundColor = "gray";
-    // addShiftTypeDiv.style.color = "white";
-    addShiftTypeBt.style.borderRadius = "1vw";
-    addShiftTypeBt.style.margin = "1vw";
-    addShiftTypeBt.style.padding = "1vw";
-    addShiftTypeBt.style.display = "inline-block";
-    addShiftTypeBt.style.textAlign = "center";
-    addShiftTypeBt.style.alignItems = "center";
-    // addShiftTypeDiv.style.width = "80%";
-    addShiftTypeBt.style.verticalAlign = "middle";
-    addShiftTypeBt.style.cursor = "pointer";
-    addShiftTypeBt.style.height = "auto";
-    clearShiftBt = addShiftTypeBt.cloneNode(true);
-
-    addShiftTypeBt.addEventListener("click", function (event) {
-        //添加班次类型
-        shiftTypeEditBoxDiv.style.display = "block";
-        centerDiv.innerHTML = language.addShiftType;
-    });
-    shiftBtDiv.appendChild(addShiftTypeBt);
-
-    clearShiftBt.id = "clearShiftBt";
-    clearShiftBt.innerHTML = language.clearShift;
-    clearShiftBt.addEventListener("click", function (event) {
-        operateBoxDiv.style.display = "none";
-        document.getElementById("shiftNote").value = "";
-        centerDiv.innerHTML = "";
-        if (multiSelectedDates.length == 0) {
-            //清空当天班次
-            selectedDate.style.backgroundColor = "";
-            selectedDate.style.border = "";
-            shifts.splice(shifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
-            oldShifts.splice(oldShifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
-        } else {
-            multiSelectedDates.forEach(date => {
-                date.style.backgroundColor = "";
-                date.style.border = "";
-                shifts.splice(shifts.findIndex(shift => shift.date == date.dataset.day), 1);
-                oldShifts.splice(oldShifts.findIndex(shift => shift.date == date.dataset.day), 1);
-            });
-            multiSelectedDates = [];
-        }
-        countShifts(year, cMonth + 1, document.getElementById("countShiftDiv"));
-    });
-    shiftBtDiv.appendChild(clearShiftBt);
-
-    operateDiv.appendChild(shiftEditerDiv);
-
-    //--------------------------------------------------------------
-    //构建班次类型编辑器
-    shiftTypeEditBoxDiv = document.createElement("div");
-    shiftTypeEditBoxDiv.id = "shiftTypeEditBoxDiv";//用来某个编辑班次类型具体的起止时间，颜色等内容
-    shiftTypeEditBoxDiv.style.display = "none";
-    shiftTypeEditBoxDiv.style.position = "fixed";
-    shiftTypeEditBoxDiv.style.zIndex = "120";
-    shiftTypeEditBoxDiv.style.width = "inherit";
-    shiftTypeEditBoxDiv.style.height = "90%";
-    shiftTypeEditBoxDiv.style.fontSize = "5vh";
-    shiftTypeEditBoxDiv.style.textAlign = "center";
-    shiftTypeEditBoxDiv.style.alignItems = "center";
-    shiftTypeEditBoxDiv.style.backgroundColor = "white";
-    //插入一个div容纳start, end, summary, created, alarm,contentForAlarm,alarmFile,color
-
-    var contentDiv = document.createElement("div");
-    contentDiv.id = "contentDiv";
-    contentDiv.style.width = "100%";
-    contentDiv.style.height = "80%";
-    contentDiv.style.display = "flex";
-    contentDiv.style.flexDirection = "column";
-    contentDiv.style.justifyContent = "space-around";
-    contentDiv.style.alignItems = "center";
-    shiftTypeEditBoxDiv.appendChild(contentDiv);
-
-    var startContainer = document.createElement("div");
-    startContainer.className = "row"
-    //在start前增加一个language.start的标签
-    var startLabel = document.createElement("div");
-    startLabel.className = "label"
-    startLabel.innerHTML = language.start;
-    startContainer.appendChild(startLabel);
-    //start 是一个时间选择器value 类似“08:00”
-    var start = document.createElement("input");
-    start.className = "content";
-    start.type = "time";
-    start.id = "start";
-    startContainer.appendChild(start);
-    contentDiv.appendChild(startContainer);
-
-    var endContainer = document.createElement("div");
-    endContainer.className = "row"
-    //在end前增加一个language.end的标签
-    var endLabel = document.createElement("div");
-    endLabel.className = "label"
-    endLabel.innerHTML = language.end;
-    endContainer.appendChild(endLabel);
-    //end 是一个时间选择器value 类似“17:00”
-    var end = document.createElement("input");
-    end.className = "content";
-    end.type = "time";
-    end.id = "end";
-    endContainer.appendChild(end);
-    contentDiv.appendChild(endContainer);
-
-    var summaryContainer = document.createElement("div");
-    summaryContainer.className = "row"
-    //在summary前增加一个language.summary的标签
-    var summaryLabel = document.createElement("div");
-    summaryLabel.className = "label"
-    summaryLabel.innerHTML = language.summary;
-    summaryContainer.appendChild(summaryLabel);
-    //summary 是一个文本输入框value 类似“早班”
-    var summary = document.createElement("input");
-    summary.className = "content";
-    summary.type = "text";
-    summary.id = "summary";
-    summaryContainer.appendChild(summary);
-    contentDiv.appendChild(summaryContainer);
-
-    var alarmContainer = document.createElement("div");
-    alarmContainer.className = "row"
-    //在alarm前增加一个language.alarm的标签
-    var alarmLabel = document.createElement("div");
-    alarmLabel.className = "label"
-    alarmLabel.innerHTML = language.alarm;
-    alarmContainer.appendChild(alarmLabel);
-    //alarm 是一个选择器 显示可供选择的内容 为language.selectAbleTimes。value为相应类似“-PT5M ，-PT10M ... ”
-    var alarm = document.createElement("select");
-    alarm.className = "content";
-    alarm.id = "alarm";
-    language.selectAbleTimes.forEach((time, i) => {
-        const option = document.createElement("option");
-        option.value = selectAbleTimesValue[i];
-        option.text = time;
-        alarm.appendChild(option);
-    });
-    alarm.value = "-PT1H";
-    alarmContainer.appendChild(alarm);
-    contentDiv.appendChild(alarmContainer);
-
-    var contentForAlarmContainer = document.createElement("div");
-    contentForAlarmContainer.className = "row"
-    //在contentForAlarm前增加一个language.description的标签
-    var contentForAlarmLabel = document.createElement("div");
-    contentForAlarmLabel.className = "label"
-    contentForAlarmLabel.innerHTML = language.description;
-    contentForAlarmContainer.appendChild(contentForAlarmLabel);
-    //contentForAlarm 是一个文本输入框value 类似“早班提醒”
-    var contentForAlarm = document.createElement("input");
-    contentForAlarm.className = "content";
-    contentForAlarm.type = "text";
-    contentForAlarm.id = "contentForAlarm";
-    contentForAlarmContainer.appendChild(contentForAlarm);
-    contentDiv.appendChild(contentForAlarmContainer);
-
-    // var alarmFileContainer = document.createElement("div");
-    // alarmFileContainer.className = "row"
-    //在alarmFile前增加一个language.alarmAudio的标签
-    // var alarmAudioLabel = document.createElement("div");
-    // alarmAudioLabel.className = "label"
-    // alarmAudioLabel.innerHTML = language.alarmAudio;
-    // alarmFileContainer.appendChild(alarmAudioLabel);
-    // //alarmSelector 是一个按钮，点击后弹出系统打开文件对话框，选择一个音频文件，返回文件名到alarmFile
-    // var alarmSelector = document.createElement("button");
-    // alarmSelector.className = "content";
-    // alarmSelector.id = "alarmFile";
-    // alarmSelector.innerHTML = language.openFile;
-    // alarmSelector.addEventListener("click", function (event) {
-    //     selectFile();
-    // });
-    // alarmFileContainer.appendChild(alarmSelector);
-    // contentDiv.appendChild(alarmFileContainer);
-
-    var colorContainer = document.createElement("div");
-    colorContainer.className = "row"
-    //在color前增加一个language.selectShiftColor的标签
-    var colorLabel = document.createElement("div");
-    colorLabel.className = "label"
-    colorLabel.innerHTML = language.selectShiftColor;
-    colorContainer.appendChild(colorLabel);
-    //color 是一个文本框value 类似“#FF0000”，其背景色为该颜色，其文本为白色+阴影
-    var color = document.createElement("input");
-    color.className = "content";
-    color.value = "#FF0000";
-    // color.style.backgroundColor = "#FF0000";
-    color.style.color = "white";
-    color.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    color.type = "color";
-    color.id = "color";
-    colorContainer.appendChild(color);
-    contentDiv.appendChild(colorContainer);
-
-    //插入一个底部div来容纳clear，cancel，save按钮
-    var bottomDiv = document.createElement("div");
-    bottomDiv.id = "bottomDiv";
-    bottomDiv.style.width = "100%";
-    bottomDiv.style.display = "flex";
-    bottomDiv.style.justifyContent = "space-around";
-    bottomDiv.style.alignItems = "center";
-    shiftTypeEditBoxDiv.appendChild(bottomDiv);
-
-    //clear 是一个按钮，点击后清空所有输入框
-    var clear = document.createElement("button");
-    clear.id = "clear";
-    clear.innerHTML = language.clear;
-    clear.addEventListener("click", clearForm);
-    clear.style.width = "20%";
-    clear.style.height = "70%";
-    bottomDiv.appendChild(clear);
-
-    //cancel 是一个按钮，点击后清空所有输入框，并更改shiftTypeEditBoxDiv.style.display = "none";
-    var cancel = document.createElement("button");
-    cancel.id = "cancel";
-    cancel.innerHTML = language.cancel;
-    cancel.addEventListener("click", function (event) {
-        clearForm();
-        shiftTypeEditBoxDiv.style.display = "none";
-    });
-    cancel.style.width = "20%";
-    cancel.style.height = "70%";
-    bottomDiv.appendChild(cancel);
-    //save 是一个按钮，点击后调用函数addShiftType()，并更改shiftTypeEditBoxDiv.style.display = "none";
-    var save = document.createElement("button");
-    save.id = "save";
-    save.innerHTML = language.create;
-    save.addEventListener("click", function (event) {
-        addShiftType();
-        clearForm();
-        shiftTypeEditBoxDiv.style.display = "none";
-        loadShiftType();
-    });
-    save.style.width = "20%";
-    save.style.height = "70%";
-    bottomDiv.appendChild(save);
-    operateDiv.appendChild(shiftTypeEditBoxDiv);
-
-    var countShiftDiv = document.createElement("div");
-    countShiftDiv.id = "countShiftDiv";
-    document.body.appendChild(countShiftDiv);
-
-    //----------------------------------------------------------------
-    //用来展示班次类别的div
-
-    generateCalendar(0);
-    //if (oldLandscape != landscape) {
-    //adjustUI();
-    // }
-}
-function clearForm() {
-    document.getElementById("start").value = "";
-    document.getElementById("end").value = "";
-    document.getElementById("summary").value = "";
-    document.getElementById("alarm").value = "-PT1H";
-    document.getElementById("contentForAlarm").value = "";
-    // document.getElementById("alarmFile").value = "";
-    // document.getElementById("alarmFile").innerHTML = language.openFile;
-    document.getElementById("color").value = "#ff0000";
-    document.getElementById("contentDiv").dataset.id = undefined;
-}
-function pushNotes(date, note) {
-    var existShift = shifts.find(shift => shift.date == date);
-    if (existShift == undefined) {//如果不存在则检测老班表
-        var existOldShift = oldShifts.find(shift => shift.date == date);
-        if (existOldShift != undefined) {//如果存在则把老班表的班次类型赋予当前选择日期
-            shifts.push({ date: date, uid: existOldShift.uid, note: note });
-            oldShifts.splice(oldShifts.findIndex(shift => shift.date == date), 1);
-        }else{//如果不存在则添加新的班次类型
-            shifts.push({ date: date, uid: "", note: note });
-        }
-    } else {//如果存在则更新note
-        existShift.note = note;
-    }
-}
-
-function loadShiftType() {
-
-    shiftTypeListDiv.innerHTML = "";
-    for (var i = 0; i < shiftTypeTable.length; i++) {
-        //用来展示班次类型的div
-        var shiftType = document.createElement("div");
-        shiftType.id = shiftTypeTable[i].uid;
-        shiftType.innerHTML = shiftTypeTable[i].summary;
-        shiftType.style.backgroundColor = shiftTypeTable[i].color;
-        shiftType.style.color = "white";
-        // shiftType.style.borderRadius = "1vw";
-        shiftType.style.margin = "1vw";
-        // shiftType.style.padding = "1vw";
-        // shiftType.style.display = "inline-block";
-        shiftType.style.fontSize = "5vh";
-        shiftType.style.textAlign = "center";
-        shiftType.style.alignItems = "center";
-        // shiftType.style.width = "inherit";
-        // shiftType.style.height = "10vh";
-        // shiftType.style.lineHeight = "10vh";
-        shiftType.style.verticalAlign = "middle";
-        shiftType.style.cursor = "pointer";
-        shiftType.style.textShadow = "gray 0.2em 0.1em 0.2em";
-
-        shiftType.addEventListener("click", function (event) {
-            if (event.target.id == this.id) {
-                var note = document.getElementById("shiftNote").value;
-                if (multiSelectedDates.length == 0) {
-                    //赋予当前选择日期当前的班次类型
-                    var existShift = shifts.find(shift => shift.date == selectedDate.dataset.day);
-                    //TODO:赋予当前选择日期当前的班次类型
-                    if (existShift == undefined) {
-                        shifts.push({ date: selectedDate.dataset.day, uid: this.id, note: note });
-                        downloaded = false;
-                        oldShifts.splice(oldShifts.findIndex(shift => shift.date == selectedDate.dataset.day), 1);
-                    } else {
-                        existShift.uid = this.id;
-                        existShift.note = note;
-                    }
-                    selectedDate.style.backgroundColor = this.style.backgroundColor;
-                    selectedDate.style.border = "";
-
-                } else {
-                    //赋予当前选择日期当前的班次类型
-                    var notes = note.split("\n");
-                    for (var i = 0; i < multiSelectedDates.length; i++) {
-                        var existShift = shifts.find(shift => shift.date == multiSelectedDates[i].dataset.day);
-                        if (existShift == undefined) {
-                            shifts.push({ date: multiSelectedDates[i].dataset.day, uid: this.id, note: i < notes.length ? notes[i] : "" });
-                            downloaded = false;
-                            oldShifts.splice(oldShifts.findIndex(shift => shift.date == multiSelectedDates[i].dataset.day), 1);
-                        } else {
-                            existShift.uid = this.id;
-                            existShift.note = i < notes.length ? notes[i] : "";
-                        }
-                        multiSelectedDates[i].style.backgroundColor = this.style.backgroundColor;
-                        multiSelectedDates[i].style.border = "";
-                    }
-                    multiSelectedDates = [];
-                }
-                operateBoxDiv.style.display = "none";
-                document.getElementById("shiftNote").value = "";
-                centerDiv.innerHTML = "";
-                countShifts(year, cMonth + 1, document.getElementById("countShiftDiv"));
-            }
-        });
-        //编辑当前的班次类型,或者删除当前的班次类型 按钮构造
-        editShiftTypeBt = document.createElement("button");
-        // editShiftTypeBt.style.backgroundColor = "gray";
-        // editShiftTypeBt.style.color = "white";
-        // editShiftTypeBt.style.borderRadius = "1vw";
-        editShiftTypeBt.style.margin = "1vw";
-        editShiftTypeBt.style.padding = "1vw";
-        editShiftTypeBt.style.display = "inline-block";
-        editShiftTypeBt.style.textAlign = "center";
-        editShiftTypeBt.style.alignItems = "center";
-        editShiftTypeBt.style.verticalAlign = "middle";
-        editShiftTypeBt.style.cursor = "pointer";
-        editShiftTypeBt.id = "editShiftTypeBt";
-        removeShiftTypeBt = editShiftTypeBt.cloneNode(true);
-        //编辑当前的班次类型
-        editShiftTypeBt.innerHTML = language.edit;
-        editShiftTypeBt.addEventListener("click", function (event) {
-            editShiftTpye(event.target.parentNode.id);
-            shiftTypeEditBoxDiv.style.display = "block";
-            centerDiv.innerHTML = language.editShiftType;
-        });
-        shiftType.appendChild(editShiftTypeBt);
-        //删除当前的班次类型
-        removeShiftTypeBt.id = "removeShiftTypeBt";
-        removeShiftTypeBt.innerHTML = language.remove;
-        removeShiftTypeBt.addEventListener("click", function (event) {
-            removeShiftType(shiftType.id);
-            loadShiftType();
-        });
-        shiftType.appendChild(removeShiftTypeBt);
-        shiftTypeListDiv.appendChild(shiftType);
-    }
-}
-function checkLandscape() {
-    oldLandscape = landscape;
-    if (document.documentElement.clientWidth > document.documentElement.clientHeight) {
-        landscape = true;
-    } else {
-        landscape = false;
-    }
-}
-function adjustUI() {
-    //document.documentElement.clientWidth 
-    // document.documentElement.clientHeight
-    var whRatio = document.documentElement.clientWidth / document.documentElement.clientHeight;
-    var availableRatio = [2 / 6, 3 / 4, 4 / 3, 6 / 2];
-    //移动div到中间
-    // operateDiv.style.transform = "translate(-50%,-50%)";
-    /*  var grid = document.getElementsByClassName("grid-container");
-  
-      if (grid != null) {
-          if (displayMonthMode) {
-              grid.style.border = "0.2vw solid black";
-              grid.style.borderRadius = "1vw";
-              grid.style.fontSize = "XX-Large";
-          } else {
-              if (landscape) {
-                  grid.style.fontSize = "small";
-              } else {
-                  grid.style.fontSize = "X-Large";
-              }
-          }
+      // Released on the same cell as pointerdown
+      const cell=e.target.closest('[data-key]'); if(!cell) return;
+      const k=cell.dataset.key;
+      if(eraserOn||brush){
+        // Already painted/erased in pointerdown; just save
+        save(); renderCalendar();
+      } else {
+        // No tool: toggle selection
+        toggleSel(k,cell);
       }
-  */
-    if (whRatio < (availableRatio[0] + availableRatio[1]) / 2) {
-        //2/6
-        setGrid(2, 6);
-    } else if (whRatio < (availableRatio[1] + availableRatio[2]) / 2) {
-        //3/4
-        setGrid(3, 4);
-    } else if (whRatio < (availableRatio[2] + availableRatio[3] / 2)) {
-        //4/3
-        setGrid(4, 3);
-    } else {
-        //6/2
-        setGrid(6, 2);
     }
+    didDrag=false; downKey=null;
+  });
 
+  container.addEventListener('pointercancel',()=>{ ptrDown=false; didDrag=false; downKey=null; });
 }
 
-function setGrid(col, row) {
-    // monthContainer
-    var mthctner = document.getElementById("monthContainer");
-    if (mthctner != null) {
-        mthctner.style.gridTemplateColumns = "repeat(" + col + ", 1fr)";
-        mthctner.style.gridTemplateRows = "repeat(" + row + ", 1fr)";
-        // mthctner.style.height=" 80%";
-    }
+// ── Calendar ──────────────────────────────────────
+function renderCalendar(){
+  renderNav();
+  const td=todayK();
+  if(mo===null) renderYear(td);
+  else          renderMonth(td);
+  renderStats();
 }
-function generateCalendar(displayM) {
-    calendarDiv.innerHTML = "";
-    // 创建 h1 元素
-    const yearHeading = document.createElement("h1");
-    yearHeading.id = "year";
-    yearHeading.addEventListener("click", function () { if (displayMonthMode) { generateCalendar(0); } });
-    // yearHeading.innerHTML = year;
 
-    // 创建 div 元素
-    const monthContainer = document.createElement("div");
-    monthContainer.className = "month-container";
-    monthContainer.id = "monthContainer";
-
-    // 将元素添加到页面中的适当位置
-    calendarDiv.appendChild(yearHeading);
-    calendarDiv.appendChild(monthContainer);
-
-
-    if (displayM === 0) {
-        displayMonthMode = false;
-        for (var k = 0; k < 12; k++) {
-            generateMonth(year, k, monthContainer);
-        }
-    } else if (displayM >= 1 && displayM <= 12) {
-        displayMonthMode = true;
-        generateMonth(year, displayM - 1, monthContainer);
-        //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
-        monthContainer.style.display = "block";
-        //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
-    } else if (displayM === 13 && displayMonthMode) {
-        if (cMonth === 11) { year++; cMonth = 0; } else { cMonth++; }
-        generateMonth(year, cMonth, monthContainer);
-        //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
-        monthContainer.style.display = "block";
-        //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
-    } else if (displayM === 14 && displayMonthMode) {
-        if (cMonth === 0) { year--; cMonth = 11; } else { cMonth--; }
-        generateMonth(year, cMonth, monthContainer);
-        //yearHeading.innerHTML = year + " - " + monthNames[displayM - 1];
-        monthContainer.style.display = "block";
-        //monthContainer.style.gridTemplateColumns = "repeat(auto-fill, minmax(20vw, 1fr))";
-    }
-    //下载班表按钮
-    var downloadButton = document.createElement("button");
-    downloadButton.id = "downloadButton";
-    downloadButton.innerHTML = language.download;
-    // downloadButton.style.backgroundColor = "gray";
-    // downloadButton.style.color = "white";
-    // downloadButton.style.borderRadius = "1vw";
-    // downloadButton.style.margin = "1vw";
-    // downloadButton.style.padding = "1vw";
-    downloadButton.style.display = "inline-block";
-    downloadButton.style.textAlign = "center";
-    downloadButton.style.alignItems = "center";
-    downloadButton.style.verticalAlign = "middle";
-    downloadButton.style.cursor = "pointer";
-    downloadButton.style.textShadow = "gray 0.2em 0.1em 0.2em";
-    var clearButton = downloadButton.cloneNode(true);
-    var importButton = downloadButton.cloneNode(true);
-    downloadButton.addEventListener("click", function (event) {//仅下载当前
-        if (displayMonthMode) {//下载当前月份
-            downloadRoster(shifts.filter(shift => {
-                var date = new Date(shift.Date);
-                return date.getUTCMonth() === cMonth;
-            }));
-        } else {//下载所有
-            downloadRoster(shifts);
-        }
-    });
-    downloadButton.addEventListener("dblclick", function (event) {//下载所有
-        if (displayMonthMode) {//下载当前月份
-            downloadRoster([...oldShifts, ...shifts].filter(shift => {
-                var date = new Date(shift.Date);
-                return date.getUTCMonth() === cMonth;
-            }));
-        } else {//下载所有
-            downloadRoster([...oldShifts, ...shifts]);
-        }
-    });
-    downloadButton.addEventListener("contextmenu", function (event) {//下载shiftType为json文件
-        event.preventDefault();
-        downloadShiftType(shiftTypeTable);
-    });
-    rightDiv.innerHTML = "";
-    rightDiv.appendChild(downloadButton);
-    centerDiv.innerHTML = year;
-    clearButton.id = "clearButton";
-    clearButton.innerHTML = language.clearAll;
-    clearButton.addEventListener("click", function (event) {//clear current
-        if (displayMonthMode) { //clear current month  new shifts
-            shifts = shifts.filter(shift => {
-                var date = new Date(shift.Date);
-                return date.getUTCMonth() !== cMonth;
-            });
-            generateCalendar(cMonth + 1);
-        } else { //clear all new shifts
-            shifts = [];
-            generateCalendar(0);
-        }
-    });
-    clearButton.addEventListener("dblclick", function (event) {//all clear
-        if (displayMonthMode) { //clear current month old and new shifts
-            shifts = shifts.filter(shift => {
-                var date = new Date(shift.Date);
-                return date.getUTCMonth() !== cMonth;
-            });
-            oldShifts = oldShifts.filter(shift => {
-                var date = new Date(shift.Date);
-                return date.getUTCMonth() !== cMonth;
-            });
-            generateCalendar(cMonth + 1);
-        } else {// clear all old and new shifts
-            shifts = [];
-            oldShifts = [];
-            generateCalendar(0);
-        }
-    });
-    clearButton.addEventListener("contextmenu", function (event) {//shiftType as well
-        event.preventDefault();
-        shiftTypeTable = [];
-        shifts = [];
-        oldShifts = [];
-        generateCalendar(0);
-    });
-
-    leftDiv.innerHTML = "";
-    leftDiv.appendChild(clearButton);
-    importButton.id = "importButton";
-    importButton.innerHTML = language.import;
-    importButton.addEventListener("click", function (event) {//导入ics班表文件
-        //打开文件对话框，只接受ics文件
-        var fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.ics';
-        fileInput.onchange = function () {
-            importRoster(fileInput.files[0]);
-        };
-        fileInput.click();
-
-        //打开后把文件内容发给importRoster(fileContent)
-
-    });
-
-    importButton.addEventListener("contextmenu", function (event) {//导入json班次文件
-        event.preventDefault();
-        //打开文件对话框，只接受json文件
-        var fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.json';
-        fileInput.onchange = function () {
-            importShiftType(fileInput.files[0]);
-        };
-        fileInput.click();
-    });
-
-    leftDiv.appendChild(importButton);
-    adjustUI();
-    countShifts(year, displayM, document.getElementById("countShiftDiv"));
+function renderNav(){
+  get('yearLabel').textContent=yr;
+  get('monthLabel').textContent=mo!==null?MONTH[mo]:'全年';
+  const c=get('monthBtns'); c.innerHTML='';
+  const ab=mk('button','mbtn'+(mo===null?' on':'')); ab.textContent='全年';
+  ab.onclick=()=>{mo=null;renderCalendar();}; c.appendChild(ab);
+  for(let i=0;i<12;i++){
+    const b=mk('button','mbtn'+(mo===i?' on':''));
+    b.textContent=(i+1)+'月'; b.onclick=()=>{mo=i;renderCalendar();}; c.appendChild(b);
+  }
 }
-//拖放文件到浏览器窗口
 
-document.addEventListener("dragenter", function (event) {
-    //阻止默认动作
-    event.preventDefault();
-}, false);
-document.addEventListener("dragover", function (event) {
-    //阻止默认动作
-    event.preventDefault();
-}, false);
-document.addEventListener("drop", function (event) {
-    //阻止默认动作
-    event.preventDefault();
-    importRoster(event.dataTransfer.files[0]);
-}, false);
+// ── Year view ─────────────────────────────────────
+function renderYear(td){
+  get('yearGrid').style.display='grid';
+  get('singleMonth').style.display='none';
+  const g=get('yearGrid'); g.innerHTML='';
+  for(let m=0;m<12;m++) g.appendChild(buildMini(yr,m,td));
+  g.querySelectorAll('.day-grid').forEach(dg=>initPointerDrag(dg));
+  g.querySelectorAll('[data-key]').forEach(attachCtx);
+}
 
-//shifts = [{date: "2021-01-01T00:00:00.000Z", uid: "1"}, {date: "2021-01-02T00:00:00.000Z", uid: "2"}];
-function importRoster(file) {
-    //解析ics文件内容，把里面的班次信息提取出来，放到shifts里面
-    var reader = new FileReader();
-    reader.onload = function () {
-        var content = reader.result;
-        var lines = content.split("\n");
-        let shift = {};
-        var uidSwitch = false;
-        var alarmTime = undefined;
-        // 遍历每一行
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (line === 'BEGIN:VEVENT') { // 开始一个新的班
-                shift = {};
-            } else if (line === 'END:VEVENT') {// 结束当前班，将其添加到班数列中
-                shifts.push(shift);
-            } else if (line.startsWith('DTSTART:')) { // 提取班日期
-                //提取日期并转成本地日期格式文本
-                //从line的第8个字符开始取8个字符
-                alarmTime = parseICSDateTime(line.substring(8));
-            } else if (line.startsWith('UID:')) {// 提取班次UID
-                if (uidSwitch) {
-                    shift.uid = line.substring(4);
-                    uidSwitch = false;
-                    //fix next line:
-                    var tm = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid).start;
-                    if (tm == undefined) return;
-                    shift.date = minusTime(alarmTime, tm);
-                }
-            } else if (line.startsWith('BEGIN:VALARM')) {// 提取班次UID控制
-                uidSwitch = true;
-            } else if (line.startsWith('END:VALARM')) {// 提取班次UID控制
-                uidSwitch = false;
-            } else if (line.startsWith('PRODID:')) {//判断是否兼容
-                if (line.substring(7) != "-//leoncoolmoon/workCalender//workCalender v1.0//EN") {
-                    alert(language.notCompatible);
-                    return;
-                }
-            } else if (line.startsWith('DESCRIPTION:')) {
-                shift.note = line.substring(12);
-                //去掉第一行
-                var pos = shift.note.indexOf("-")
-                if (pos != -1) {
-                    shift.note = shift.note.substring(pos + 1);
-                } else {
-                    shift.note = "";
-                };
-            }
-        }
-        generateCalendar(0);
+function buildMini(y,m,td){
+  const wrap=mk('div','mini-month');
+  const hdr=mk('div','mini-hdr');
+  hdr.innerHTML=`<span>${MONTH[m]}</span>`; hdr.appendChild(buildTally(y,m));
+  hdr.onclick=()=>{mo=m;renderCalendar();}; wrap.appendChild(hdr);
+  const wh=mk('div','wk-hdr');
+  WEEK.forEach(w=>{const s=document.createElement('span');s.textContent=w;wh.appendChild(s);});
+  wrap.appendChild(wh);
+  const dg=mk('div','day-grid');
+  const off=(new Date(y,m,1).getDay()+6)%7, dim=new Date(y,m+1,0).getDate();
+  for(let i=0;i<off;i++) dg.appendChild(mk('div','dc other'));
+  for(let d=1;d<=dim;d++) dg.appendChild(buildCell(y,m,d,td,false));
+  wrap.appendChild(dg); return wrap;
+}
+
+function buildTally(y,m){
+  const wrap=mk('div','tally'), cnts={}, pfx=`${y}-${String(m+1).padStart(2,'0')}-`;
+  Object.entries(roster).forEach(([k,v])=>{ if(k.startsWith(pfx)&&v.uid) cnts[v.uid]=(cnts[v.uid]||0)+1; });
+  Object.entries(cnts).forEach(([u,c])=>{
+    const st=byUid(u); if(!st)return;
+    const b=mk('span','tb'); b.style.background=st.color; b.textContent=`${st.name}×${c}`; wrap.appendChild(b);
+  });
+  return wrap;
+}
+
+// ── Month view ────────────────────────────────────
+function renderMonth(td){
+  get('yearGrid').style.display='none';
+  get('singleMonth').style.display='block';
+  const wh=get('bigWkHdr'); wh.innerHTML='';
+  WEEK.forEach(w=>{const s=document.createElement('span');s.textContent='周'+w;wh.appendChild(s);});
+  const g=get('bigDayGrid'); g.innerHTML='';
+  const y=yr,m=mo;
+  const off=(new Date(y,m,1).getDay()+6)%7, dim=new Date(y,m+1,0).getDate();
+  for(let i=0;i<off;i++){const c=mk('div','dc big other');g.appendChild(c);}
+  for(let d=1;d<=dim;d++) g.appendChild(buildCell(y,m,d,td,true));
+  initPointerDrag(g);
+  g.querySelectorAll('[data-key]').forEach(attachCtx);
+}
+
+// ── Unified cell builder ──────────────────────────
+function buildCell(y,m,d,td,big){
+  const k=dk(y,m,d), ro=roster[k], st=ro&&ro.uid?byUid(ro.uid):null;
+  const wd=(new Date(y,m,d).getDay()+6)%7;
+  const cls=['dc',
+    big?'big':'',
+    wd>=5?'wknd':'',
+    k===td?'today':'',
+    st?'painted':'',
+    selDates.has(k)?'sel':'',
+  ].filter(Boolean).join(' ');
+  const c=mk('div',cls); c.dataset.key=k;
+  if(st){ c.style.background=st.color+(big?'cc':'bb'); if(big)c.style.borderColor='transparent'; }
+  const num=mk('div','dc-num'); num.textContent=d; c.appendChild(num);
+  if(st&&big){const n=mk('div','dc-shift');n.textContent=st.name;c.appendChild(n);}
+  if(ro&&ro.note&&big){const n=mk('div','dc-note');n.textContent=ro.note;c.appendChild(n);}
+  return c;
+}
+
+// ── Context menu ──────────────────────────────────
+function attachCtx(cell){
+  cell.addEventListener('contextmenu',e=>{
+    e.preventDefault(); ctxKey=cell.dataset.key;
+    buildCtxShifts();
+    const ro=roster[ctxKey];
+    get('ctxSwitch').style.display=(ro&&ro.uid)?'flex':'none';
+    get('ctxShifts').style.display='none';
+    showCtx(e.clientX,e.clientY);
+  });
+}
+function buildCtxShifts(){
+  const c=get('ctxShifts'); c.innerHTML='';
+  shifts.forEach(st=>{
+    const item=mk('div','ci');
+    item.innerHTML=`<span style="width:8px;height:8px;border-radius:2px;background:${st.color};display:inline-block;flex-shrink:0"></span> ${esc(st.name)}`;
+    item.onclick=()=>{
+      if(ctxKey){if(!roster[ctxKey])roster[ctxKey]={};roster[ctxKey].uid=st.uid;save();renderCalendar();}
+      hideCtx();
     };
-    reader.readAsText(file);
+    c.appendChild(item);
+  });
 }
-function parseICSDateTime(dateTimeString) {
-    //有bug，时间转换后不能还原原来的时间
+function showCtx(x,y){
+  const m=get('ctx');
+  m.style.display='block';
+  m.style.left=Math.min(x,window.innerWidth-170)+'px';
+  m.style.top=Math.min(y,window.innerHeight-200)+'px';
+}
+function hideCtx(){ get('ctx').style.display='none'; }
 
-    // 移除"T"和"Z"字符
-    dateTimeString = dateTimeString.replace("T", "").replace("Z", "");
-
-    // 将ICS日期时间字符串转换为JavaScript的Date对象
-    const year = dateTimeString.substring(0, 4);
-    const month = dateTimeString.substring(4, 6) - 1; // 月份从0开始，需要减去1
-    const day = dateTimeString.substring(6, 8);
-    const hour = dateTimeString.substring(8, 10);
-    const minute = dateTimeString.substring(10, 12);
-    const second = dateTimeString.substring(12, 14);
-
-    const date = new Date(year, month, day, hour, minute, second);
-    // 获取本地时区与UTC的分钟差异
-    const timezoneOffset = date.getTimezoneOffset();
-
-    // 调整时间偏移
-    date.setMinutes(date.getMinutes() - timezoneOffset);
-    // 返回JavaScript本地时间的ISO字符串
-
-    return date.toISOString();
+// ── Stats ─────────────────────────────────────────
+function renderStats(){
+  const bar=get('statsBar'); bar.innerHTML='';
+  const pfx=mo!==null?`${yr}-${String(mo+1).padStart(2,'0')}-`:`${yr}-`;
+  const cnts={};
+  Object.entries(roster).forEach(([k,v])=>{ if(k.startsWith(pfx)&&v.uid) cnts[v.uid]=(cnts[v.uid]||0)+1; });
+  if(!Object.keys(cnts).length){
+    const em=mk('span'); em.style.cssText='font-size:11px;color:var(--text2)';
+    em.textContent=mo!==null?'本月暂无班次':'本年暂无班次'; bar.appendChild(em); return;
+  }
+  Object.entries(cnts).forEach(([u,c])=>{
+    const st=byUid(u); if(!st)return;
+    const b=mk('div','stat');
+    b.innerHTML=`<div class="stat-dot" style="background:${st.color}"></div><span>${esc(st.name)}: ${c}天</span>`;
+    bar.appendChild(b);
+  });
 }
 
-function generateMonth(year, month, container) {
-    cMonth = month;
-    var monthDiv = document.createElement("div");
-    var monthTitle = document.createElement("h2");
-    monthTitle.innerHTML = language.monthNames[month];
-    if (displayMonthMode) {
-        var next = document.createElement("button");
-        next.id = "next";
-        next.innerHTML = ">";
-        next.style.float = "right";
-        next.style.fontSize = "1.5em";
-        next.style.borderRadius = "1vw";
-        next.style.margin = "1vw";
-        next.style.padding = "1vw";
-        next.style.display = "inline-block";
-        next.style.textAlign = "center";
-        next.style.alignItems = "center";
-        next.style.verticalAlign = "middle";
-        next.style.cursor = "pointer";
-        next.style.textShadow = "gray 0.2em 0.1em 0.2em";
-        var previous = next.cloneNode(true);
-        previous.innerHTML = "<";
-        previous.id = "previous";
-        previous.style.float = "left";
-        monthTitle.insertAdjacentHTML('beforeend', next.outerHTML.replace("<button", "<button onclick = 'generateCalendar(13)' "));
-        monthTitle.insertAdjacentHTML('afterbegin', previous.outerHTML.replace("<button", "<button onclick = 'generateCalendar(14)' "));
-        // document.getElementById("previous").addEventListener("click", function (event) {
-        //     if (event.target.id == "previous") {
-        //         generateCalendar(month);
-        //     }
-        // });
-        // document.getElementById("next").addEventListener("click", function (event) {
-        //     if (event.target.id == "next") {
-        //         generateCalendar(month + 2);
-        //     }
-        //});
-    }
+// ── Note modal ────────────────────────────────────
+function openNote(){
+  const dates=[...selDates]; if(!dates.length)return;
+  get('noteText').value=dates.map(k=>(roster[k]&&roster[k].note)||'').join('\n');
+  get('noteModal').classList.add('open'); setTimeout(()=>get('noteText').focus(),40);
+}
+function closeNote(){ get('noteModal').classList.remove('open'); }
+function saveNote(){
+  const lines=get('noteText').value.split('\n');
+  [...selDates].forEach((k,i)=>{
+    if(!roster[k])roster[k]={};
+    roster[k].note=lines[i]!==undefined?lines[i]:'';
+    if(!roster[k].uid&&!roster[k].note)delete roster[k];
+  });
+  save(); closeNote(); renderCalendar();
+}
 
-    monthDiv.appendChild(monthTitle);
-    monthDiv.id = month + 1;
-    if (displayMonthMode) {
-        monthDiv.style.height = monthModeHeight;
-        monthDiv.style.fontSize = "5em";
-    } else {
-        monthDiv.className = "month";
-        monthDiv.style.height = "inherit";
-        monthDiv.style.fontSize = "1.5em";
-        monthDiv.addEventListener("click", function (event) {
-            if (!displayMonthMode) {
-                // if (event.target.id == this.id) {
-                generateCalendar(parseInt(this.id))
-                // }
-            }
+// ── JSON export / import ──────────────────────────
+function exportJson(){
+  const enriched={};
+  Object.entries(roster).forEach(([k,v])=>{
+    const st=v.uid?byUid(v.uid):null;
+    enriched[k]={uid:v.uid||null,note:v.note||null,
+      shiftName:st?st.name:null, shiftStart:st?st.start:null,
+      shiftEnd:st?st.end:null,   shiftColor:st?st.color:null};
+  });
+  dl(JSON.stringify({version:3,exportedAt:new Date().toISOString(),shifts,roster:enriched},null,2),
+     'application/json',`roster_${todayK()}.json`);
+}
+function importJson(file){
+  readF(file,txt=>{
+    try{
+      const data=JSON.parse(txt);
+      if(data.shifts) shifts=data.shifts;
+      if(data.roster){
+        const clean={};
+        Object.entries(data.roster).forEach(([k,v])=>{
+          const entry={uid:v.uid||undefined,note:v.note||undefined};
+          if(entry.uid||entry.note) clean[k]=entry;
         });
-    }
-    var grid = document.createElement("div");
-    grid.className = "grid-container";
-    var firstDay = new Date(year, month, 1).getDay() - 1;
-    if (firstDay === -1) firstDay = 6; // If first day is Sunday
-    var daysInMonth = 32 - new Date(year, month, 32).getDate();
-    var date = 1;
+        Object.assign(roster,clean);
+      }
+      save(); renderPalette(); renderCalendar(); alert('导入成功！');
+    }catch(e){alert('JSON格式错误：'+e.message);}
+  });
+}
 
-    for (var j = 0; j < 7; j++) {
-        var cell = document.createElement("div");
-        cell.className = "grid-item";
-        cell.innerHTML = language.weekNames[j];
-        if (j == 5 || j == 6) cell.classList.add("weekend");
-        if (displayMonthMode) {
-            cell.style.height = monthModeHeight;
-            //cell.style.fontSize = "3em";
-        } else {
-            cell.style.height = "inherit";
-            // cell.style.fontSize = "1.5em";
+const buildVtimezone = tz => {
+  if (tz === 'Australia/Brisbane') {
+    return `BEGIN:VTIMEZONE
+TZID:Australia/Brisbane
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+1000
+TZOFFSETTO:+1000
+TZNAME:AEST
+END:STANDARD
+END:VTIMEZONE
+`;
+  }
+
+  // fallback（其他时区简单处理）
+  return `BEGIN:VTIMEZONE
+TZID:${tz}
+END:VTIMEZONE
+`;
+};
+
+// ── ICS export ────────────────────────────────────
+function exportIcs(){
+  const pad = n => n<10?'0'+n:''+n;
+
+  // Floating local time: no Z, no TZID — calendar app uses device timezone
+  const fmtLocal = (y,m,d,h,min) =>
+    `${y}${pad(m+1)}${pad(d)}T${pad(h)}${pad(min)}00`;
+
+  // DTSTAMP must be UTC per RFC 5545
+  const fmtUTC = dt =>
+    dt.getUTCFullYear()+pad(dt.getUTCMonth()+1)+pad(dt.getUTCDate())+
+    'T'+pad(dt.getUTCHours())+pad(dt.getUTCMinutes())+'00Z';
+
+  const ev=[];
+  Object.entries(roster).forEach(([k,v])=>{
+    if(!v.uid)return; const st=byUid(v.uid); if(!st||!st.alarm)return;
+    const y=+k.slice(0,4), m=+k.slice(5,7)-1, d=+k.slice(8,10);
+    const [sh,sm]=st.start.split(':').map(Number);
+    const [eh,em]=st.end.split(':').map(Number);
+    // Midnight-crossing shift: end date is next day
+    let ey=y, em2=m, ed=d;
+    if(eh<sh||(eh===sh&&em<=sm)){
+      const tmp=new Date(y,m,d+1);
+      ey=tmp.getFullYear(); em2=tmp.getMonth(); ed=tmp.getDate();
+    }
+    const dtStart=fmtLocal(y,m,d,sh,sm), dtEnd=fmtLocal(ey,em2,ed,eh,em);
+    const tr=alarmV(st.alarm), note=v.note?'-'+v.note:'';
+    const alarm=tr?`BEGIN:VALARM
+TRIGGER:${tr}
+ACTION:DISPLAY
+DESCRIPTION:${st.name}${note}
+END:VALARM
+`:'';
+    ev.push(`BEGIN:VEVENT
+UID:${genUid()}@workcal
+DTSTAMP:${fmtUTC(new Date())}
+DTSTART;TZID=${TZ}:${dtStart}
+DTEND;TZID=${TZ}:${dtEnd}
+SUMMARY:${st.name}${note}
+${alarm}END:VEVENT`);
+  });
+  if(!ev.length){alert('\u6ca1\u6709\u542b\u63d0\u9192\u7684\u73ed\u6b21\u53ef\u5bfc\u51fa');return;}
+  //dl('BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//WorkCal//v3//ZH\n'+ev.join('\n')+'\nEND:VCALENDAR','text/calendar','roster_'+todayK()+'.ics');
+
+
+  dl(
+    'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//WorkCal//v3//ZH\n' +
+    buildVtimezone(TZ) +
+    ev.join('\n') +
+    '\nEND:VCALENDAR',
+    'text/calendar',
+    'roster_'+todayK()+'.ics'
+  );
+
+}
+
+// ── ICS import ────────────────────────────────────
+function importIcs(file){
+  readF(file,txt=>{
+    const lines=txt.split(/\r?\n/); let inEv=false,dtstart=null,summary=null;
+    lines.forEach(raw=>{
+      const l=raw.trim();
+      if(l==='BEGIN:VEVENT'){inEv=true;dtstart=null;summary=null;}
+      else if(l==='END:VEVENT'){
+        if(dtstart&&summary){
+          const st=shifts.find(s=>s.name===summary||summary.startsWith(s.name));
+          if(st){if(!roster[dtstart])roster[dtstart]={};roster[dtstart].uid=st.uid;}
         }
-        cell.style.height = displayMonthMode ? monthModeHeight : "inherit";
-        //cell.classList.add("weekend");
-        grid.appendChild(cell);
-    }
-    if (displayMonthMode) {
-        grid.style.border = "0.2vw solid black";
-        grid.style.borderRadius = "1vw";
-        grid.style.fontSize = "XX-Large";
-    }
-    else {
-        grid.style.border = "";
-        if (!landscape) {
-            grid.style.fontSize = "X-Large";
-        } else {
-            grid.style.fontSize = "small";
-        }
-    }
-    for (var i = 0; i < 6; i++) {
-        for (var j = 0; j < 7; j++) {
-            var cell = document.createElement("div");
-            cell.className = "grid-item";
-            if (displayMonthMode) {
-                cell.addEventListener("click", function (event) {
-                    selectedDate = event.target;
-                    selectedDate.style.border = "0.2vw solid black";
-                    centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
-                    if (!multipleSelectMode) {
-                        operateBoxDiv.style.display = "block";
-                        document.getElementById("shiftNote").value = "";
-                        var existShift = shifts.find(shift => shift.date == selectedDate.dataset.day);
-                        if (existShift != undefined && existShift != -1) {
-                            document.getElementById("shiftNote").value = existShift.note;
-                        }
-                    } else {
-                        var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
-                        if (f == undefined || f == -1) {
-                            multiSelectedDates.push(event.target);
-                        } else {
-                            multiSelectedDates = multiSelectedDates.filter(date => date.dataset.day != event.target.dataset.day);
-                            selectedDate.style.border = "";
-                        }
-                    }
-
-                });
-                cell.addEventListener("contextmenu", function (event) {
-                    //跳转到今天
-                    event.preventDefault();
-                    multipleSelectMode = !multipleSelectMode;
-                    //multiSelectedDates is a target array
-                    var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
-                    if (f == undefined || f == -1) {
-                        multiSelectedDates.push(event.target);
-                    }
-                    selectedDate = event.target;
-                    selectedDate.style.border = "0.2vw solid black";
-                    centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
-                    if (multipleSelectMode) {
-                        //start select
-                    } else {
-                        //finish select
-                        //action
-                        operateBoxDiv.style.display = "block";
-                        document.getElementById("shiftNote").value = "";
-                        multiSelectedDates.forEach(date => {
-                            var existShift = shifts.find(shift => shift.date == date.dataset.day);
-                            if (existShift != undefined && existShift != -1) {
-                                document.getElementById("shiftNote").value = document.getElementById("shiftNote").value + "\n" + existShift.note;
-                            }
-                        });
-                    }
-                });
-                // //鼠标移动到日期上时如果时多选模式则选中此日期
-                // cell.addEventListener("mouseover", function (event) {
-                //     if (multipleSelectMode) {
-                //         selectedDate = event.target;
-                //         selectedDate.style.border = "0.2vw solid black";
-                //         centerDiv.innerHTML = doubleNum(selectedDate.innerHTML) + "-" + language.monthNames[month] + "-" + year;
-                //         var f = multiSelectedDates.find(date => date.dataset.day == event.target.dataset.day);
-                //         if (f == undefined || f == -1) {
-                //             multiSelectedDates.push(event.target);
-                //         }else{
-                //             multiSelectedDates = multiSelectedDates.filter(date => date.dataset.day != event.target.dataset.day);
-                //             selectedDate.style.border = "";
-                //         }
-
-                //     }
-                // });
-                cell.style.height = monthModeHeight;
-                //cell.style.fontSize = "3em";
-            } else {
-                cell.style.height = "inherit";
-                //cell.style.fontSize = "1.5em";
-            }
-            if (i === 0 && j < firstDay) {
-                cell.innerHTML = "";
-            } else if (date > daysInMonth) {
-                break;
-            } else {
-                var d = new Date(year, month, date).toISOString();
-                var n = [...oldShifts, ...shifts].find(shift => shift.date === d);
-                var s = (n != undefined && n != -1) ? shiftTypeTable.find(shift => shift.uid == n.uid) : undefined;
-                cell.style.backgroundColor = (s != undefined && s != -1) ? s.color : "";
-                // dataset.day is a string
-                cell.dataset.day = d;
-                // if(date == 16) {
-                //     cell.style.color = "red";
-                // }
-                if (displayMonthMode && n != undefined && n != -1 && n.note != undefined && n.note != "") {
-                    cell.innerHTML = date + "<br>" + n.note;
-                } else {
-                    cell.innerHTML = date;
-                }
-                if (j === 5 || j === 6) {
-                    cell.classList.add("weekend");
-                }
-                date++;
-            }
-            grid.appendChild(cell);
-        }
-    }
-
-    monthDiv.appendChild(grid);
-    container.appendChild(monthDiv);
-}
-
-function doubleNum(num) {
-    if (num < 10) {
-        return "0" + num;
-    }
-    return num;
-}
-
-//班次类型操作 编辑，查找，删除，添加
-function editShiftTpye(uid) {//编辑班次类型
-    var i = findShiftType(uid);
-    if (i == undefined) {
-        alert(language.shiftNotFound);
-        return;
-    } else {
-        document.getElementById("start").value = shiftTypeTable[i].start;
-        document.getElementById("end").value = rm24(shiftTypeTable[i].end);
-        document.getElementById("summary").value = shiftTypeTable[i].summary;
-        document.getElementById("alarm").value = shiftTypeTable[i].trigger;
-        document.getElementById("contentForAlarm").value = shiftTypeTable[i].description;
-        // document.getElementById("alarmFile").value = shiftTypeTable[i].audioFile;
-        // document.getElementById("alarmFile").innerHTML = getName(shiftTypeTable[i].audioFile);
-        document.getElementById("color").value = shiftTypeTable[i].color;
-        document.getElementById("contentDiv").dataset.id = shiftTypeTable[i].uid;
-    }
-}
-
-function findShiftType(uid) {//查找shift类型的index
-    return shiftTypeTable.findIndex(shiftType => shiftType.uid == uid);
-}
-
-function removeShiftType(uid) {//删除shift类型
-    var i = findShiftType(uid);
-    if (i == undefined) {
-        //alert(language.shiftNotFound);
-        return;
-    }
-    shiftTypeTable.splice(i, 1);
-}
-function updateShiftType(shiftType) {//修改shift类型
-    var i = findShiftType(shiftType.uid);
-    if (i == undefined) {
-        //alert(language.shiftNotFound);
-        return;
-    }
-    shiftTypeTable.splice(i, 1, shiftType);
-}
-function add24(time) {
-    var hour = parseInt(time.substring(0, 2));
-    hour = hour + 24;
-    return hour + time.substring(2, 5);
-}
-function rm24(time) {
-    var hour = parseInt(time.substring(0, 2));
-    if (hour < 24)
-        return time;
-    hour = hour - 24;
-    return doubleNum(hour) + time.substring(2, 5);
-}
-function addShiftType() {//添加shift类型
-    var shiftTpye = {};
-
-    shiftTpye.start = document.getElementById("start").value;//shift类型所对应的开始时间
-    shiftTpye.end = document.getElementById("end").value;//shift类型所对应的结束时间
-    if (shiftTpye.end < shiftTpye.start) {
-        shiftTpye.end = add24(shiftTpye.end);
-    }
-    shiftTpye.summary = document.getElementById("summary").value;//shift类型：从am，pm，night，dayoff，vacation，sick，holiday中选择或者自己输入
-    shiftTpye.trigger = document.getElementById("alarm").value;//shift类型所对应的提醒时间
-    shiftTpye.description = document.getElementById("contentForAlarm").value;//shift类型所对应的提醒内容
-    // shiftTpye.audioFile = document.getElementById("alarmFile").value;//shift类型所对应的提醒音频文件
-    shiftTpye.color = document.getElementById("color").value;//shift类型所对应的颜色
-    shiftTpye.uid = document.getElementById("contentDiv").dataset.id;
-    if (shiftTpye.uid == undefined || shiftTpye.uid == "" || shiftTpye.uid == null || shiftTpye.uid == "undefined") {
-        shiftTpye.uid = generateUUID();
-        //添加shift类型    
-        shiftTypeTable.push(shiftTpye);
-    } else {
-        //更新shift类型
-        updateShiftType(shiftTpye);
-    }
-
-}
-//班次类型操作 编辑，查找，删除，添加
-
-function selectFile() {//打开 打开文件对话框来从本地选择一个文件 返回文件名
-
-    var fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.id = "audioInput";
-    //接受音频文件
-    fileInput.accept = 'audio/*';
-    //fileInput.accept = plainTextFile;//+ "," + STL;
-    fileInput.onchange = function (event) {
-        audioFile = event.target.files[0];
-        var button = document.getElementById("alarmFile");
-        var path = (window.URL || window.webkitURL).createObjectURL(audioFile);
-        console.log('path', path);
-        button.value = this.value;//系统阻止了获取文件名
-        button.innerHTML = audioFile.name;
-
-    };
-    fileInput.click();
-
-}
-function getName(path) {
-    var index = path.lastIndexOf("\\");
-    return path.substring(index + 1, path.length);
-}
-
-
-function creatVALARM(trigger, description, audioFile, uid) {
-    if (trigger == null || trigger == undefined || trigger == "") {
-        return "";
-    }
-    if (description == null) {
-        description = "Reminder";
-    }
-    var alarm = "BEGIN:VALARM\n"
-        + "UID:" + uid + "\n"
-        + "TRIGGER:" + trigger + "\n"
-        + "ACTION:DISPLAY\n"
-        + "DESCRIPTION:" + description + "\n"
-        + "END:VALARM\n";
-    if (audioFile != null) {
-        alarm = alarm
-            + "BEGIN:VALARM\n"
-            + "TRIGGER:" + trigger + "\n"
-            + "ACTION:AUDIO\n"
-            + "ATTACH;VALUE=URI:file://" + audioFile + "\n"
-            + "END:VALARM\n";
-    }
-    //ATTACH;FMTTYPE=audio/basic:file:///sdcard/notifications/notification.mp3
-    return alarm;
-}
-
-function createVEvent(start, end, summary, created, alarm) {
-    // 创建一个随机的 UID
-    var uid = Math.random().toString(36).substring(2) + "@example.com";
-
-    // 将 JavaScript 日期对象转换为 iCalendar 日期时间格式
-    function formatDateTime(date) {
-        function pad(n) { return n < 10 ? '0' + n : n }
-        return date.getUTCFullYear()
-            + pad(date.getUTCMonth() + 1)
-            + pad(date.getUTCDate())
-            + 'T' + pad(date.getUTCHours())
-            + pad(date.getUTCMinutes())
-            + pad(date.getUTCSeconds())
-            + 'Z';
-    }
-    var dtstart = formatDateTime(new Date(start));
-    var dtend = formatDateTime(new Date(end));
-    var dtstamp = formatDateTime(new Date(created));
-
-    // 将 符合ISO 8601标准的格式 日期对象转换为 iCalendar 日期格式
-    // function formatDate(date) {
-    //     function pad(n) { return n < 10 ? '0' + n : n }
-    //     return date.getUTCFullYear()
-    //         + pad(date.getUTCMonth() + 1)
-    //         + pad(date.getUTCDate());
-    // }
-    // var dtstart = formatDate(start);
-    // var dtend = formatDate(end);
-    // var dtstamp = formatDate(created);
-
-    // 创建 VEVENT 组件
-    var vevent = "BEGIN:VEVENT\n"
-        + "UID:" + uid + "\n"
-        + "DTSTAMP:" + dtstamp + "\n"
-        + "DTSTART:" + dtstart + "\n"
-        + "DTEND:" + dtend + "\n"
-        + "SUMMARY:" + summary + "\n"
-        + alarm
-        + "END:VEVENT";
-
-    return vevent;
-}
-function createVCalendar(vevents) {
-    // 创建 VCALENDAR 组件
-    var vcalendar = "BEGIN:VCALENDAR\n"
-        + "VERSION:2.0\n"
-        + "PRODID:-//leoncoolmoon/workCalender//workCalender v1.0//EN\n"
-        + vevents.join("\n")
-        + "\nEND:VCALENDAR";
-
-    return vcalendar;
-}
-function downloadVCalendar(vcalendar) {
-    // 创建一个下载链接
-    var link = document.createElement('a');
-    link.setAttribute('href', 'data:text/calendar;charset=utf-8,' + encodeURIComponent(vcalendar));
-    var timeStemp = new Date().getTime();
-    link.setAttribute('download', 'myShift' + timeStemp + '.ics');
-    link.click();
-}
-function downloadShiftType(shiftTypeTable) {
-    // 创建一个下载链接
-    var link = document.createElement('a');
-    var shiftTypeString = JSON.stringify(shiftTypeTable);
-    link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(shiftTypeString));
-    var timeStemp = new Date().getTime();
-    link.setAttribute('download', 'shiftType' + timeStemp + '.json');
-    link.click();
-}
-function importShiftType(file) {
-    //解析json文件内容，把里面的班次信息提取出来，放到shiftTypeTable里面
-    var reader = new FileReader();
-    reader.onload = function () {
-        var content = reader.result;
-        var shiftTypeTableA = JSON.parse(content);
-        shiftTypeTableA.forEach(shiftType => {
-            var i = findShiftType(shiftType.uid);
-            if (i == undefined || i == -1) {
-                shiftTypeTable.push(shiftType);
-            } else {
-                shiftTypeTable.splice(i, 1, shiftType);
-            }
-        });
-        loadShiftType();
-    };
-    reader.readAsText(file);
-}
-
-function downloadRoster(shiftsA) {
-    if (shiftsA === shifts) {
-        downloaded = true;
-    }
-    var vevents = [];
-    shiftsA.forEach(shift => {
-        var shiftType = shiftTypeTable.find(shiftType => shiftType.uid == shift.uid);
-        if (shiftType != undefined && shiftType != -1) {
-            //用shift.date和shiftType.start合成ISO 8601标准的格式字符串 
-            var start = addTime(shift.date, shiftType.start);
-            var end = addTime(shift.date, shiftType.end);
-            var t = typeof (shiftType.start);
-            //now
-            var created = new Date().toISOString();
-            var note = "";
-            if (shift.note != undefined && shift.note != "") {
-                note = "-" + shift.note;
-            }
-            var valarm = creatVALARM(shiftType.trigger, shiftType.description + note, shiftType.audioFile, shiftType.uid);
-            if (valarm != "") {//不带提醒的班次不导出
-                vevents.push(createVEvent(start, end, shiftType.summary, created, valarm));
-            }
-        }
+        inEv=false;
+      } else if(inEv){
+      if(l.startsWith('DTSTART')){
+        const idx = l.indexOf(':');
+        if(idx === -1) return;
+        const v = l.slice(idx + 1);
+        const p = v.replace('Z','').replace('T','').slice(0,8);
+        dtstart = `${p.slice(0,4)}-${p.slice(4,6)}-${p.slice(6,8)}`;
+      }
+        else if(l.startsWith('SUMMARY:'))summary=l.slice(8);
+      }
     });
-    if (vevents.length == 0) {
-        return;
+    save(); renderCalendar(); alert('ICS导入完成');
+  });
+}
+
+// ── Helpers ───────────────────────────────────────
+function dl(content,type,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+function readF(file,cb){const r=new FileReader();r.onload=()=>cb(r.result);r.readAsText(file);}
+
+// ── Init ──────────────────────────────────────────
+window.onload=()=>{
+  load();
+  // Year nav
+  get('prevYear').onclick=()=>{yr--;renderCalendar();};
+  get('nextYear').onclick=()=>{yr++;renderCalendar();};
+  get('yearLabel').onclick=()=>{mo=null;renderCalendar();};
+  get('prevBtn').onclick=()=>{ if(mo===null)yr--; else if(mo===0){yr--;mo=11;}else mo--; renderCalendar(); };
+  get('nextBtn').onclick=()=>{ if(mo===null)yr++; else if(mo===11){yr++;mo=0;}else mo++; renderCalendar(); };
+  // Palette
+  get('togglePal').onclick=()=>get('palette').classList.toggle('closed');
+  get('eraserBtn').onclick=()=>setEraser(!eraserOn);
+  get('addChipBtn').onclick=()=>openShiftModal(null);
+  // Shift modal
+  get('smClose').onclick=closeShiftModal; get('smCancel').onclick=closeShiftModal;
+  get('smSave').onclick=saveShiftModal;
+  get('shiftModal').onclick=e=>{if(e.target===get('shiftModal'))closeShiftModal();};
+  // Note modal
+  get('nmClose').onclick=closeNote; get('nmCancel').onclick=closeNote;
+  get('nmSave').onclick=saveNote;
+  get('noteModal').onclick=e=>{if(e.target===get('noteModal'))closeNote();};
+  // Selection bar
+  get('applyBtn').onclick=applyToSel;
+  get('clearSelBtn').onclick=clearSel;
+  get('noteBtn').onclick=openNote;
+  get('deselBtn').onclick=deselectAll;
+  // IO
+  get('expJsonBtn').onclick=exportJson;
+  get('impJsonBtn').onclick=()=>get('impJsonFile').click();
+  get('impJsonFile').onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value='';};
+  get('expIcsBtn').onclick=exportIcs;
+  get('impIcsFile').onchange=e=>{if(e.target.files[0])importIcs(e.target.files[0]);e.target.value='';};
+  // Context menu
+  get('ctxSwitch').addEventListener('click',e=>{
+    e.stopPropagation();
+    const cs=get('ctxShifts'); cs.style.display=cs.style.display==='none'?'flex':'none';
+  });
+  get('ctxNote').onclick=()=>{ hideCtx(); if(!selDates.has(ctxKey))addSel(ctxKey); openNote(); };
+  get('ctxDel').onclick=()=>{ hideCtx(); if(ctxKey){erase(ctxKey);save();renderCalendar();} };
+  document.addEventListener('click',e=>{ if(!e.target.closest('#ctx'))hideCtx(); });
+  // Keyboard shortcuts
+  document.addEventListener('keydown',e=>{
+    const tag=document.activeElement.tagName;
+    if(e.key==='Escape'){ closeShiftModal();closeNote();deselectAll();hideCtx();setEraser(false); }
+    if(e.key==='Enter'){
+      if(get('shiftModal').classList.contains('open'))saveShiftModal();
+      if(get('noteModal').classList.contains('open'))saveNote();
     }
-    var vcalendar = createVCalendar(vevents);
-    downloadVCalendar(vcalendar);
-}
-
-function addTime(dateStr, timeStr) {
-    // 将日期字符串解析为 Date 对象
-    var date = new Date(dateStr);
-
-    // 将时间段字符串分解为小时和分钟
-    var timeParts = timeStr.split(':');
-    var hours = parseInt(timeParts[0]);
-    var minutes = parseInt(timeParts[1]);
-
-    // 将时间段添加到日期上
-    date.setHours(date.getHours() + hours);
-    date.setMinutes(date.getMinutes() + minutes);
-
-    // 将新的日期对象转换回字符串
-    return date.toISOString();
-}
-function minusTime(dateStr, timeStr) {
-    // 将日期字符串解析为 Date 对象
-    var date = new Date(dateStr);
-
-    // 将时间段字符串分解为小时和分钟
-    var timeParts = timeStr.split(':');
-    var hours = parseInt(timeParts[0]);
-    var minutes = parseInt(timeParts[1]);
-
-    // 将时间段添加到日期上
-    date.setHours(date.getHours() - hours);
-    date.setMinutes(date.getMinutes() - minutes);
-
-    // 将新的日期对象转换回字符串
-    return date.toISOString();
-}
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0,
-            v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-// 保存shifts[] 和 shiftTypeTable[]到localStorage
-function saveRoster() {
-    var shiftString = JSON.stringify([...oldShifts, ...shifts]);
-    localStorage.setItem("shifts", shiftString);
-    var shiftTypeString = JSON.stringify(shiftTypeTable);
-    localStorage.setItem("shiftTypeTable", shiftTypeString);
-}
-
-// 从localStorage中读取shifts[] 和 shiftTypeTable[]
-function loadRoster() {
-    var shiftString = localStorage.getItem("shifts");
-    if (shiftString != null) {
-        oldShifts = JSON.parse(shiftString);
-    }
-    var shiftTypeString = localStorage.getItem("shiftTypeTable");
-    if (shiftTypeString != null) {
-        shiftTypeTable = JSON.parse(shiftTypeString);
-    }
-}
-
-function countShifts(year, month, shiftCountDiv) {
-    shiftCountDiv.style.position = "absolute";
-    shiftCountDiv.style.bottom = "0";
-    shiftCountDiv.style.left = "0";
-    shiftCountDiv.style.zIndex = "90";
-    shiftCountDiv.style.fontSize = "12em";
-    shiftCountDiv.style.textShadow = "#878787 1em 1em 0.5em";
-    shiftCountDiv.style.paddingRight = "5vw";
-    // shiftCountDiv.style.paddingLeft = "5vw";
-    shiftCountDiv.style.height = "5vh";
-    shiftCountDiv.style.display = "flex";
-    shiftCountDiv.style.textAlign = "center";
-    shiftCountDiv.style.alignItems = "center";
-    shiftCountDiv.style.verticalAlign = "middle";
-    shiftCountDiv.style.justifyContent = "space-between";
-    shiftCountDiv.style.width = "-webkit-fill-available";
-    shiftCountDiv.innerHTML = "";
-    // box-shadow: rgb(0 0 0 / 75%) 0 1vh 1vh;
-    shiftCountDiv.style.boxShadow = "rgb(0 0 0 / 75%) 0 -1vh 1vh";
-    var knownShifts = [...oldShifts, ...shifts];
-    if (month == 0) {//count year shifts count by different shiftType
-        shiftTypeTable.forEach(shiftType => {
-            var shiftCount = 0;
-            knownShifts.forEach(shift => {
-                if (shift.uid == shiftType.uid && shift.date.substring(0, 4) == year) {
-                    shiftCount++;
-                }
-            });
-            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: " + shiftType.color + ";padding-right: 2em;'>" + shiftType.summary + ":" + shiftCount + " </span>";
-        });
-    } else if (month > 0 && month <= 12) {//count month shifts count by different shiftType
-        shiftTypeTable.forEach(shiftType => {
-            var shiftCount = 0;
-            knownShifts.forEach(shift => {
-                if (shift.uid == shiftType.uid && shift.date.substring(0, 7) == year + "-" + doubleNum(month)) {
-                    shiftCount++;
-                }
-            });
-            //把这个div置页面底部，顶层
-            shiftCountDiv.innerHTML = shiftCountDiv.innerHTML + "<span style='background-color: " + shiftType.color + ";padding-right: 2em;'>" + shiftType.summary + ":" + shiftCount + " </span>";
-        });
-    }
-}
-
+    if((e.key==='e'||e.key==='E')&&tag!=='INPUT'&&tag!=='TEXTAREA') setEraser(!eraserOn);
+  });
+  // File drag-drop
+  document.addEventListener('dragover',e=>e.preventDefault());
+  document.addEventListener('drop',e=>{
+    e.preventDefault(); const f=e.dataTransfer.files[0]; if(!f)return;
+    if(f.name.endsWith('.json'))importJson(f);
+    else if(f.name.endsWith('.ics'))importIcs(f);
+  });
+  renderPalette();
+  renderCalendar();
+};
+window.addEventListener('beforeunload',save);
