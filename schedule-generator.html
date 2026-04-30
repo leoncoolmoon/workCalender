@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>班表生成器</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f4; color: #1c1917; padding: 2rem; min-height: 100vh; }
+.app { max-width: 860px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 700; color: #111; letter-spacing: -0.02em; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #78716c; margin-bottom: 2rem; }
+.section { margin-bottom: 1.4rem; }
+.label { font-size: 10px; font-weight: 700; color: #a8a29e; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
+.label-badge { font-size: 9px; background: #e7e5e4; color: #78716c; border-radius: 3px; padding: 1px 5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.hint { font-size: 11px; color: #a8a29e; margin-top: 5px; line-height: 1.5; }
+.hint code { font-family: 'SF Mono', monospace; background: #f5f5f4; padding: 1px 4px; border-radius: 3px; font-size: 10px; }
+.error-msg { font-size: 12px; color: #dc2626; margin-top: 6px; }
+.tag { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 4px; }
+.tag-local { background: #dcfce7; color: #15803d; }
+.tag-online { background: #dbeafe; color: #1d4ed8; }
+
+/* Inputs */
+input[type=text], input[type=password], textarea, select {
+  background: #fff; border: 1px solid #d6d3d1; color: #1c1917;
+  border-radius: 6px; padding: 8px 12px; font-family: inherit; font-size: 13px;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type=text]:focus, input[type=password]:focus, textarea:focus, select:focus {
+  border-color: #a78bfa; box-shadow: 0 0 0 3px #ede9fe;
+}
+input[type=text], input[type=password], select { height: 36px; }
+.url-input { flex: 1; font-family: 'SF Mono', monospace; font-size: 12px; }
+.api-key-input { flex: 1; }
+textarea { width: 100%; resize: vertical; line-height: 1.6; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+select { cursor: pointer; }
+
+/* Buttons */
+button {
+  background: #fff; border: 1px solid #d6d3d1; color: #44403c;
+  border-radius: 6px; padding: 0 14px; height: 36px; font-family: inherit;
+  font-size: 13px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+button:hover { background: #f5f5f4; border-color: #a8a29e; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.primary-btn {
+  background: #1c1917; color: #fafaf9; border-color: #1c1917;
+  font-weight: 600; padding: 0 22px; height: 38px;
+}
+.primary-btn:hover { background: #292524; border-color: #292524; }
+.primary-btn:disabled { background: #d6d3d1; color: #a8a29e; border-color: #d6d3d1; }
+
+/* Server card */
+.server-card { background: #fff; border: 1px solid #e7e5e4; border-radius: 10px; padding: 14px 16px; margin-bottom: 1.4rem; }
+.server-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.server-row:last-child { margin-bottom: 0; }
+.server-type-select { width: 200px; }
+
+/* Models grid — same as benchmark */
+.models-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.model-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid #e7e5e4; border-radius: 6px; cursor: pointer; background: #fff;
+  transition: border-color 0.15s, background 0.15s; user-select: none;
+}
+.model-item:hover { border-color: #c4b5fd; background: #faf5ff; }
+.model-item.selected { border-color: #7c3aed; background: #f5f3ff; }
+.model-item input[type=radio] { accent-color: #7c3aed; width: 13px; height: 13px; flex-shrink: 0; cursor: pointer; }
+.model-name { font-size: 12px; color: #44403c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'SF Mono', monospace; }
+.model-item.selected .model-name { color: #6d28d9; font-weight: 600; }
+.empty-msg { font-size: 13px; color: #a8a29e; text-align: center; padding: 1.5rem 0; grid-column: 1/-1; }
+
+/* Model assignment boxes */
+.assign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.assign-box { border: 1px solid #e7e5e4; border-radius: 8px; padding: 12px 14px; background: #fafaf9; }
+.assign-box-title { font-size: 10px; font-weight: 700; color: #a8a29e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.assign-select { width: 100%; }
+.assign-note { font-size: 11px; color: #a8a29e; margin-top: 5px; }
+
+/* Upload area */
+.upload-zone {
+  border: 1.5px dashed #d6d3d1; border-radius: 8px; padding: 24px;
+  text-align: center; cursor: pointer; color: #a8a29e; font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.upload-zone:hover, .upload-zone.drag { border-color: #a78bfa; background: #faf5ff; color: #7c3aed; }
+.upload-zone.has-file { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+.preview-img { max-width: 100%; max-height: 220px; border-radius: 6px; display: block; margin: 10px auto 0; border: 1px solid #e7e5e4; }
+
+/* Steps */
+.steps-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.step-dot { width: 7px; height: 7px; border-radius: 50%; background: #d6d3d1; flex-shrink: 0; transition: background 0.2s; }
+.step-dot.done { background: #22c55e; }
+.step-dot.active { background: #7c3aed; animation: pulse 1s ease-in-out infinite; }
+.step-dot.err { background: #ef4444; }
+.step-label { font-size: 12px; color: #78716c; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+.sep { color: #d6d3d1; font-size: 11px; }
+
+/* Actions row */
+.actions-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.status-bar { font-size: 12px; color: #78716c; margin-top: 8px; min-height: 18px; }
+.status-ok { color: #15803d; }
+.status-err { color: #dc2626; }
+
+/* JSON output */
+.output-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; color: #78716c; }
+.json-textarea { min-height: 220px; color: #1c1917; }
+.copy-ok { font-size: 12px; color: #15803d; margin-top: 5px; min-height: 16px; }
+
+/* Row util */
+.row { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>班表生成器</h1>
+  <p class="sub">上传排班图片，自动识别并导出 JSON 格式班表</p>
+
+  <!-- ── 1. Server Config ── -->
+  <div class="server-card">
+    <div class="server-row">
+      <select id="serverType" class="server-type-select">
+        <optgroup label="本地服务">
+          <option value="ollama">Ollama</option>
+          <option value="lmstudio">LM Studio</option>
+          <option value="llamacpp">llama.cpp</option>
+          <option value="jan">Jan</option>
+        </optgroup>
+        <optgroup label="在线服务">
+          <option value="openai" selected>OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="groq">Groq</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="together">Together AI</option>
+        </optgroup>
+        <optgroup label="自定义">
+          <option value="custom">自定义 OpenAI 兼容端点</option>
+        </optgroup>
+      </select>
+      <input class="url-input" id="serverUrl" type="text" value="https://api.openai.com" />
+      <button id="fetchBtn">获取模型 →</button>
+      <button id="saveBtn">保存 ✓</button>
+    </div>
+    <div class="server-row" id="apiKeyRow">
+      <span style="font-size:12px;color:#78716c;white-space:nowrap;">API Key</span>
+      <input class="api-key-input" id="apiKey" type="password" placeholder="sk-..." />
+    </div>
+    <div class="hint" id="serverHint"></div>
+    <div id="fetchError" class="error-msg" style="display:none;"></div>
+  </div>
+
+  <!-- ── 2. Models ── -->
+  <div class="section">
+    <div class="label">可用模型 <span id="modelCount" style="font-style:italic;font-weight:400;opacity:0.7;"></span></div>
+    <div id="modelsGrid" class="models-grid">
+      <div class="empty-msg">请先点击「获取模型」</div>
+    </div>
+
+    <!-- Model assignment — shown after models are loaded -->
+    <div id="assignArea" style="display:none;">
+      <div class="assign-grid">
+        <div class="assign-box">
+          <div class="assign-box-title">第一步 · 识图模型</div>
+          <select id="visionSel" class="assign-select"></select>
+          <div class="assign-note">需支持视觉识别 (vision / multimodal)</div>
+        </div>
+        <div class="assign-box">
+          <div class="assign-box-title">第二步 · JSON 生成模型</div>
+          <select id="jsonSel" class="assign-select"></select>
+          <div class="assign-note">纯文本推理即可，可与识图模型不同</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual fallback -->
+    <div id="manualArea">
+      <div class="assign-grid" style="margin-top:10px;">
+        <div class="assign-box">
+          <div class="assign-box-title">识图模型（手动输入）</div>
+          <input type="text" id="visionManual" placeholder="gpt-4o" style="width:100%;" />
+          <div class="assign-note">需支持视觉识别</div>
+        </div>
+        <div class="assign-box">
+          <div class="assign-box-title">JSON 生成模型（手动输入）</div>
+          <input type="text" id="jsonManual" placeholder="留空则与识图模型相同" style="width:100%;" />
+          <div class="assign-note">可与识图模型不同</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. Upload ── -->
+  <div class="section">
+    <div class="label">上传班表图片</div>
+    <div class="upload-zone" id="uploadZone"
+      onclick="document.getElementById('fileInput').click()"
+      ondragover="onDrag(event,true)" ondragleave="onDrag(event,false)" ondrop="onDrop(event)">
+      点击或拖拽图片到此处
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this.files[0])">
+    <div id="previewArea"></div>
+  </div>
+
+  <!-- ── 4. Generate ── -->
+  <div class="section">
+    <div class="steps-row">
+      <div class="step-dot" id="d1"></div><span class="step-label" id="s1">等待</span>
+      <span class="sep">›</span>
+      <div class="step-dot" id="d2"></div><span class="step-label" id="s2">识图</span>
+      <span class="sep">›</span>
+      <div class="step-dot" id="d3"></div><span class="step-label" id="s3">生成 JSON</span>
+    </div>
+    <div class="actions-row">
+      <button class="primary-btn" id="genBtn" onclick="generate()" disabled>生成班表 JSON</button>
+    </div>
+    <div class="status-bar" id="genStatus"></div>
+  </div>
+
+  <!-- ── 5. Output ── -->
+  <div class="section">
+    <div class="output-header">
+      <div class="label" style="margin:0">JSON 输出</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-sm" onclick="copyJSON()">复制</button>
+        <button class="btn-sm" onclick="downloadJSON()">下载 ↓</button>
+      </div>
+    </div>
+    <textarea class="json-textarea" id="jsonOutput" readonly placeholder="生成结果将显示在这里..."></textarea>
+    <div class="copy-ok" id="copyOk"></div>
+  </div>
+</div>
+
+<script>
+// ── Server profiles (same pattern as benchmark) ──────────────────────
+const SERVERS = {
+  ollama: {
+    label: 'Ollama', tag: 'local',
+    defaultUrl: 'http://localhost:11434',
+    needsKey: false,
+    hint: '本地服务 · 默认端口 <code>11434</code> · 推荐使用 <code>llava</code> 或 <code>llama3.2-vision</code>',
+    modelsPath: '/api/tags',
+    modelsExtract: d => (d.models || []).map(m => m.name || m.model).filter(Boolean),
+    isOpenAI: false,
+  },
+  lmstudio: {
+    label: 'LM Studio', tag: 'local',
+    defaultUrl: 'http://localhost:1234',
+    needsKey: false,
+    hint: '本地服务 · 默认端口 <code>1234</code> · 需在 LM Studio → Local Server 中启动',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: true,
+  },
+  llamacpp: {
+    label: 'llama.cpp', tag: 'local',
+    defaultUrl: 'http://localhost:8080',
+    needsKey: false,
+    hint: '本地服务 · 默认端口 <code>8080</code> · 使用 <code>--api</code> 启动 llama-server',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: true,
+  },
+  jan: {
+    label: 'Jan', tag: 'local',
+    defaultUrl: 'http://localhost:1337',
+    needsKey: false,
+    hint: '本地服务 · 默认端口 <code>1337</code> · 需在 Jan → Local API Server 中启动',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: true,
+  },
+  openai: {
+    label: 'OpenAI', tag: 'online',
+    defaultUrl: 'https://api.openai.com',
+    needsKey: true,
+    hint: '在线服务 · 需提供 API Key · 常用视觉模型: <code>gpt-4o</code>, <code>gpt-4o-mini</code>',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(m => /^(gpt|o1|o3)/.test(m)),
+    isOpenAI: true,
+  },
+  anthropic: {
+    label: 'Anthropic', tag: 'online',
+    defaultUrl: 'https://api.anthropic.com',
+    needsKey: true,
+    hint: '在线服务 · 原生 Anthropic API · 常用模型: <code>claude-opus-4-20250514</code>, <code>claude-sonnet-4-20250514</code>',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: false,
+    isAnthropic: true,
+  },
+  gemini: {
+    label: 'Google Gemini', tag: 'online',
+    defaultUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    needsKey: true,
+    hint: '在线服务 · 需提供 Google AI Studio API Key · 常用模型: <code>gemini-2.0-flash</code>, <code>gemini-2.5-pro-preview-05-06</code>',
+    modelsPath: '/models',
+    modelsExtract: d => (d.data || d.models || []).map(m => m.id || m.name?.replace('models/','')).filter(Boolean),
+    isOpenAI: true,
+  },
+  groq: {
+    label: 'Groq', tag: 'online',
+    defaultUrl: 'https://api.groq.com',
+    needsKey: true,
+    hint: '在线服务 · 需提供 Groq API Key · 超快推理速度',
+    modelsPath: '/openai/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    completionPathOverride: '/openai/v1/chat/completions',
+    isOpenAI: true,
+  },
+  deepseek: {
+    label: 'DeepSeek', tag: 'online',
+    defaultUrl: 'https://api.deepseek.com',
+    needsKey: true,
+    hint: '在线服务 · 需提供 DeepSeek API Key · 常用模型: <code>deepseek-chat</code>',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: true,
+  },
+  openrouter: {
+    label: 'OpenRouter', tag: 'online',
+    defaultUrl: 'https://openrouter.ai',
+    needsKey: true,
+    hint: '在线服务 · 可访问几乎所有主流模型，包括 Claude、GPT、Gemini 等',
+    modelsPath: '/api/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    completionPathOverride: '/api/v1/chat/completions',
+    isOpenAI: true,
+  },
+  together: {
+    label: 'Together AI', tag: 'online',
+    defaultUrl: 'https://api.together.xyz',
+    needsKey: true,
+    hint: '在线服务 · 支持众多开源视觉模型',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || []).map(m => m.id).filter(Boolean),
+    isOpenAI: true,
+  },
+  custom: {
+    label: '自定义', tag: null,
+    defaultUrl: 'http://localhost:8000',
+    needsKey: false,
+    hint: '自定义 OpenAI 兼容端点 · 工具会自动补全 <code>/v1/models</code> 和 <code>/v1/chat/completions</code> 路径',
+    modelsPath: '/v1/models',
+    modelsExtract: d => (d.data || d.models || []).map(m => m.id || m.name).filter(Boolean),
+    isOpenAI: true,
+  },
+};
+
+// ── State ────────────────────────────────────────────────────────────
+let fetchedModels = [];
+let usingModelList = false;
+let imageBase64 = '';
+let imageMime = 'image/jpeg';
+
+// ── Server switcher ──────────────────────────────────────────────────
+const serverTypeEl = document.getElementById('serverType');
+const serverUrlEl  = document.getElementById('serverUrl');
+
+function applyProfile(type, updateUrl = true) {
+  const p = SERVERS[type];
+  if (!p) return;
+  if (updateUrl) serverUrlEl.value = p.defaultUrl;
+  document.getElementById('apiKeyRow').style.display = p.needsKey ? 'flex' : 'none';
+  document.getElementById('serverHint').innerHTML = p.hint;
+  document.getElementById('fetchError').style.display = 'none';
+  resetModels();
+}
+
+function resetModels() {
+  fetchedModels = [];
+  usingModelList = false;
+  document.getElementById('modelsGrid').innerHTML = '<div class="empty-msg">请先点击「获取模型」</div>';
+  document.getElementById('modelCount').textContent = '';
+  document.getElementById('assignArea').style.display = 'none';
+  document.getElementById('manualArea').style.display = '';
+  updateGenBtn();
+}
+
+serverTypeEl.addEventListener('change', () => applyProfile(serverTypeEl.value));
+
+// ── Build request headers ────────────────────────────────────────────
+function getHeaders() {
+  const key = document.getElementById('apiKey').value.trim();
+  const type = serverTypeEl.value;
+  const p = SERVERS[type];
+  const h = { 'Content-Type': 'application/json' };
+  if (key) {
+    if (p.isAnthropic) {
+      h['x-api-key'] = key;
+      h['anthropic-version'] = '2023-06-01';
+      h['anthropic-dangerous-direct-browser-access'] = 'true';
+    } else {
+      h['Authorization'] = `Bearer ${key}`;
+    }
+  }
+  return h;
+}
+
+// ── Fetch models ─────────────────────────────────────────────────────
+document.getElementById('fetchBtn').addEventListener('click', fetchModels);
+
+async function fetchModels() {
+  const type = serverTypeEl.value;
+  const p = SERVERS[type];
+  const base = serverUrlEl.value.trim().replace(/\/$/, '');
+  const btn = document.getElementById('fetchBtn');
+  const errEl = document.getElementById('fetchError');
+  errEl.style.display = 'none';
+  btn.textContent = '获取中...'; btn.disabled = true;
+  try {
+    const r = await fetch(`${base}${p.modelsPath}`, { headers: getHeaders() });
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0,120)}`);
+    const data = await r.json();
+    fetchedModels = p.modelsExtract(data);
+    if (!fetchedModels.length) throw new Error('未找到可用模型，请确认服务已加载模型');
+    renderModels(fetchedModels);
+    document.getElementById('modelCount').textContent = `(${fetchedModels.length} 个)`;
+    btn.textContent = '刷新 →';
+  } catch(e) {
+    errEl.textContent = `获取失败: ${e.message}`;
+    errEl.style.display = 'block';
+    btn.textContent = '获取模型 →';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Render model radio grid ──────────────────────────────────────────
+function renderModels(models) {
+  usingModelList = true;
+  const grid = document.getElementById('modelsGrid');
+  grid.innerHTML = '';
+  models.forEach((m, i) => {
+    const item = document.createElement('label');
+    item.className = 'model-item' + (i === 0 ? ' selected' : '');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'modelRadio';
+    radio.value = m;
+    if (i === 0) radio.checked = true;
+    const span = document.createElement('span');
+    span.className = 'model-name';
+    span.title = m;
+    span.textContent = m;
+    item.appendChild(radio);
+    item.appendChild(span);
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.model-item').forEach(el => el.classList.remove('selected'));
+      item.classList.add('selected');
+      // sync first select dropdown too
+      ['visionSel','jsonSel'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel.dataset.auto === '1') { sel.value = m; }
+      });
+    });
+    item.addEventListener('click', e => {
+      if (e.target === radio) return;
+      e.preventDefault();
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change'));
+    });
+    grid.appendChild(item);
+  });
+
+  // Populate assignment selects
+  populateAssignSelects(models);
+  document.getElementById('assignArea').style.display = '';
+  document.getElementById('manualArea').style.display = 'none';
+  updateGenBtn();
+}
+
+function populateAssignSelects(models) {
+  ['visionSel', 'jsonSel'].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '';
+    models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = m;
+      sel.appendChild(o);
+    });
+    if (models.includes(prev)) sel.value = prev;
+    else { sel.value = models[0] || ''; sel.dataset.auto = '1'; }
+  });
+}
+
+// ── Save / load settings ─────────────────────────────────────────────
+document.getElementById('saveBtn').addEventListener('click', saveSettings);
+
+function saveSettings() {
+  const s = {
+    type: serverTypeEl.value,
+    url: serverUrlEl.value.trim(),
+    key: document.getElementById('apiKey').value.trim(),
+    visionManual: document.getElementById('visionManual').value.trim(),
+    jsonManual: document.getElementById('jsonManual').value.trim(),
+    fetchedModels,
+    usingModelList,
+    visionSel: document.getElementById('visionSel').value,
+    jsonSel: document.getElementById('jsonSel').value,
+  };
+  localStorage.setItem('scheduleGen_v3', JSON.stringify(s));
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = '已保存 ✓';
+  setTimeout(() => btn.textContent = '保存 ✓', 1500);
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('scheduleGen_v3') || '{}');
+    if (!s.type) { applyProfile(serverTypeEl.value); return; }
+    serverTypeEl.value = s.type;
+    applyProfile(s.type, false);
+    if (s.url) serverUrlEl.value = s.url;
+    if (s.key) document.getElementById('apiKey').value = s.key;
+    if (s.visionManual) document.getElementById('visionManual').value = s.visionManual;
+    if (s.jsonManual) document.getElementById('jsonManual').value = s.jsonManual;
+    if (s.usingModelList && s.fetchedModels?.length) {
+      fetchedModels = s.fetchedModels;
+      renderModels(fetchedModels);
+      document.getElementById('modelCount').textContent = `(${fetchedModels.length} 个)`;
+      document.getElementById('fetchBtn').textContent = '刷新 →';
+      setTimeout(() => {
+        if (s.visionSel) document.getElementById('visionSel').value = s.visionSel;
+        if (s.jsonSel) document.getElementById('jsonSel').value = s.jsonSel;
+        // Highlight the radio that matches visionSel
+        document.querySelectorAll('.model-item').forEach(item => {
+          const r = item.querySelector('input[type=radio]');
+          const isSelected = r?.value === s.visionSel;
+          item.classList.toggle('selected', isSelected);
+          if (isSelected) r.checked = true;
+        });
+      }, 0);
+    }
+  } catch(e) {
+    applyProfile(serverTypeEl.value);
+  }
+}
+
+// ── Image upload ─────────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  imageMime = file.type || 'image/jpeg';
+  const r = new FileReader();
+  r.onload = e => {
+    imageBase64 = e.target.result.split(',')[1];
+    const zone = document.getElementById('uploadZone');
+    zone.classList.add('has-file');
+    zone.textContent = `${file.name}  (${Math.round(file.size/1024)} KB)`;
+    document.getElementById('previewArea').innerHTML =
+      `<img class="preview-img" src="${e.target.result}">`;
+    updateGenBtn();
+  };
+  r.readAsDataURL(file);
+}
+function onDrag(e, enter) { e.preventDefault(); document.getElementById('uploadZone').classList.toggle('drag', enter); }
+function onDrop(e) { e.preventDefault(); onDrag(e, false); handleFile(e.dataTransfer.files[0]); }
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function getVisionModel() {
+  return usingModelList
+    ? document.getElementById('visionSel').value
+    : document.getElementById('visionManual').value.trim();
+}
+function getJsonModel() {
+  const v = usingModelList
+    ? document.getElementById('jsonSel').value
+    : document.getElementById('jsonManual').value.trim();
+  return v || getVisionModel();
+}
+function updateGenBtn() {
+  document.getElementById('genBtn').disabled = !imageBase64 || !getVisionModel();
+}
+
+function setStep(n, state) {
+  const d = document.getElementById('d'+n);
+  const s = document.getElementById('s'+n);
+  d.className = 'step-dot' + (state ? ' '+state : '');
+  const labels = { '': ['等待','识图','生成 JSON'], done:['完成','识图完成','JSON 完成'], active:['进行中','识图中…','生成 JSON…'], err:['错误','识图失败','JSON 失败'] };
+  s.textContent = (labels[state]||labels[''])[n-1];
+}
+
+// ── Core API call (supports OpenAI-compat + Anthropic native) ────────
+async function callModel(model, messages, systemPrompt) {
+  const type = serverTypeEl.value;
+  const p = SERVERS[type];
+  const base = serverUrlEl.value.trim().replace(/\/$/,'');
+  const body = { model, max_tokens: 2048, messages };
+
+  if (p.isAnthropic) {
+    if (systemPrompt) body.system = systemPrompt;
+    const r = await fetch(`${base}/v1/messages`, { method:'POST', headers:getHeaders(), body:JSON.stringify(body) });
+    if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0,200)}`);
+    return (await r.json()).content[0].text;
+  } else {
+    if (systemPrompt) body.messages = [{ role:'system', content:systemPrompt }, ...messages];
+    const completionPath = p.completionPathOverride || '/v1/chat/completions';
+    const r = await fetch(`${base}${completionPath}`, { method:'POST', headers:getHeaders(), body:JSON.stringify(body) });
+    if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0,200)}`);
+    return (await r.json()).choices[0].message.content;
+  }
+}
+
+// ── Generate ─────────────────────────────────────────────────────────
+async function generate() {
+  const vModel = getVisionModel();
+  const jModel = getJsonModel();
+  if (!imageBase64) { alert('请先上传图片'); return; }
+  if (!vModel)      { alert('请先设置识图模型'); return; }
+
+  const btn = document.getElementById('genBtn');
+  const st  = document.getElementById('genStatus');
+  btn.disabled = true;
+  document.getElementById('jsonOutput').value = '';
+  st.textContent = ''; st.className = 'status-bar';
+  setStep(1,'done'); setStep(2,'active'); setStep(3,'');
+
+  const type = serverTypeEl.value;
+  const p = SERVERS[type];
+
+  // Build image content for whichever format
+  const imgContent = p.isAnthropic
+    ? { type:'image', source:{ type:'base64', media_type:imageMime, data:imageBase64 } }
+    : { type:'image_url', image_url:{ url:`data:${imageMime};base64,${imageBase64}` } };
+
+  const visionMsgs = [{
+    role:'user',
+    content: [
+      imgContent,
+      { type:'text', text:'帮我把这个图片中的日历里的早中晚班按日期列出。请仅列出日期班次，不要解释。' }
+    ]
+  }];
+
+  const sys1 = '你是一个很仔细的助手，善于帮忙把图片内容做成格式化的文档。图中ED是早班，L是中班，NT是晚班。 列出格式如下： 4月29日：早班, 4月30日：早班, 5月1日：中班, ... 请仅列出日期班次。';
+
+  // ── Step 1: Vision ──
+  let visionResult = '';
+  try {
+    st.textContent = `识图中… [${vModel}]`;
+    visionResult = await callModel(vModel, visionMsgs, sys1);
+    setStep(2,'done'); setStep(3,'active');
+    st.textContent = `识图完成，生成 JSON 中… [${jModel}]`;
+  } catch(e) {
+    st.textContent = `识图失败: ${e.message}`; st.className = 'status-bar status-err';
+    setStep(2,'err'); btn.disabled = false; return;
+  }
+
+  // ── Step 2: JSON ──
+  try {
+    const sys2 = `你是一个很仔细的助手，能够胜任各种任务。当执行任务时你不会给多余的解释，但是会准确快速的完成任务。你特别善于根据要求准确输出json格式文档。
+json文档格式要求如下：
+{"version":3,"exportedAt":"${new Date().toISOString()}","shifts":[{"uid":"moi0oed73rh","name":"早班","start":"06:30","end":"15:00","alarm":60,"color":"#e8834f","desc":""},{"uid":"moi0oqvrx02","name":"中班","start":"14:30","end":"23:00","alarm":50,"color":"#52e84f","desc":""},{"uid":"moi0pfvyjdk","name":"夜班","start":"22:30","end":"07:00","alarm":40,"color":"#3a78d4","desc":""}],"roster":{"2026-05-15":{"uid":"moi0oqvrx02","note":null,"shiftName":"中班","shiftStart":"14:30","shiftEnd":"23:00","shiftColor":"#52e84f"}}}`;
+
+    const prompt2 = `以下提供时间均为布里斯班当地时间。
+
+工作时间：
+早班时间是06:30hrs - 15:00hrs, 
+中班时间是14:30hrs - 23:00hrs, 
+晚班时间是22:30hrs - 第二天07:00hrs。 
+
+闹钟提前量：
+早班提前1个小时闹钟。
+中班提前50分钟闹钟。
+晚班提前40分钟闹钟。
+
+请根据以下上班日期和班次信息制作一份符合要求的json文件。
+[重要!]仅输出json，不要添加其他任何信息，不要解释。如果无法转换请输出 {"version": 3,"result"：1}.
+信息：
+'''
+${visionResult}
+'''`;
+
+    const raw = await callModel(jModel, [{ role:'user', content:prompt2 }], sys2);
+    const clean = raw.replace(/```json\n?|```/g,'').trim();
+    document.getElementById('jsonOutput').value = clean;
+    setStep(3,'done');
+    const sameModel = vModel === jModel;
+    st.textContent = `生成完成！` + (sameModel ? ` [${vModel}]` : ` 识图: ${vModel} · JSON: ${jModel}`);
+    st.className = 'status-bar status-ok';
+  } catch(e) {
+    st.textContent = `JSON 生成失败: ${e.message}`; st.className = 'status-bar status-err';
+    setStep(3,'err');
+  }
+  btn.disabled = false;
+  updateGenBtn();
+}
+
+// ── Copy / Download ──────────────────────────────────────────────────
+function copyJSON() {
+  const v = document.getElementById('jsonOutput').value;
+  if (!v) return;
+  navigator.clipboard.writeText(v).then(() => {
+    const el = document.getElementById('copyOk');
+    el.textContent = '已复制到剪贴板 ✓';
+    setTimeout(() => el.textContent = '', 2000);
+  });
+}
+function downloadJSON() {
+  const v = document.getElementById('jsonOutput').value;
+  if (!v) return;
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(v);
+  a.download = `schedule_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────
+loadSettings();
+document.getElementById('visionManual').addEventListener('input', updateGenBtn);
+document.getElementById('visionSel').addEventListener('change', updateGenBtn);
+</script>
+</body>
+</html>
