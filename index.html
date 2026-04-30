@@ -3,31 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>班表管理</title>
+<title>Roster / 班表</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── THEME: DARK (default) ── */
 :root {
   --bg:#0f1117; --bg2:#1a1d27; --bg3:#242838; --border:#2e334a;
-  --text:#e8eaf0; --text2:#8b90a8; --accent:#4f8ef7; --accent2:#7c5cfc;
+  --text:#e8eaf0; --text2:#8b90a8; --hover-bg:rgba(255,255,255,.06);
+  --accent:#4f8ef7; --accent2:#7c5cfc;
   --eraser:#f75a5a; --today:#f7c948; --radius:9px; --panel-w:272px;
+  --shadow:0 20px 48px rgba(0,0,0,.55);
+  --wknd:#c4a8ff;
+  --cell-fs:1;
 }
+
+/* ── THEME: LIGHT ── */
+:root[data-theme="light"] {
+  --bg:#f0f2f7; --bg2:#ffffff; --bg3:#e8eaf0; --border:#d0d4e0;
+  --text:#1a1d2e; --text2:#6b7090; --hover-bg:rgba(0,0,0,.04);
+  --accent:#2d6ef0; --accent2:#6c3fd4;
+  --eraser:#e03030; --today:#c89000;
+  --shadow:0 8px 32px rgba(0,0,0,.12);
+  --wknd:#7c44e8;
+  --cell-fs:1;
+}
+
+/* ── SYSTEM PREFERENCE (applied before JS loads) ── */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg:#f0f2f7; --bg2:#ffffff; --bg3:#e8eaf0; --border:#d0d4e0;
+    --text:#1a1d2e; --text2:#6b7090; --hover-bg:rgba(0,0,0,.04);
+    --accent:#2d6ef0; --accent2:#6c3fd4;
+    --eraser:#e03030; --today:#c89000;
+    --shadow:0 8px 32px rgba(0,0,0,.12);
+    --wknd:#7c44e8;
+  }
+}
+
 html,body { height:100%; overflow:hidden; }
-body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; font-size:14px; }
+body { font-family:'Noto Sans SC','Inter',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; font-size:14px; transition:background .2s,color .2s; }
 
 /* ── TOP BAR ── */
 #topBar { display:flex; align-items:center; padding:0 10px; height:48px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; gap:6px; }
 #topBar h1 { font-size:13px; font-weight:700; letter-spacing:.06em; white-space:nowrap; }
 .nav-g { display:flex; align-items:center; gap:5px; }
 #yearLabel { font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; color:var(--accent); cursor:pointer; padding:1px 6px; border-radius:5px; }
-#yearLabel:hover { background:var(--bg3); }
+#yearLabel:hover { background:var(--hover-bg); }
 .ibtn { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; font-size:13px; transition:all .14s; flex-shrink:0; }
 .ibtn:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
 .ibtn.on { background:var(--accent2); border-color:var(--accent2); color:#fff; }
-.ibtn.eraser-on { background:var(--eraser); border-color:var(--eraser); color:#fff; }
 .tbtn { display:flex; align-items:center; gap:4px; padding:0 9px; height:30px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; white-space:nowrap; flex-shrink:0; transition:all .14s; }
 .tbtn:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
-.spacer { flex:1; }
+
+/* theme + lang controls */
+#themeBtn { font-size:15px; }
+#langSel { height:28px; padding:0 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; outline:none; transition:all .14s; }
+#langSel:hover { border-color:var(--accent); }
 
 /* ── LAYOUT ── */
 #main { display:flex; flex:1; overflow:hidden; min-height:0; }
@@ -35,20 +68,17 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 /* ── PALETTE ── */
 #palette { width:var(--panel-w); flex-shrink:0; display:flex; flex-direction:column; background:var(--bg2); border-right:1px solid var(--border); overflow:hidden; transition:width .22s ease,transform .22s ease; }
 #palette.closed { width:0; }
-#palHdr { padding:9px 11px 7px; border-bottom:1px solid var(--border); font-size:10px; font-weight:500; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
-
-/* eraser tool */
+#palHdr { padding:9px 11px 7px; border-bottom:1px solid var(--border); font-size:10px; font-weight:500; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; flex-shrink:0; }
 #eraserBtn { display:flex; align-items:center; gap:6px; margin:6px 8px 2px; padding:7px 10px; border-radius:7px; border:2px solid var(--border); background:var(--bg3); color:var(--text2); cursor:pointer; font-size:12px; font-family:inherit; transition:all .14s; }
 #eraserBtn:hover { border-color:var(--eraser); color:var(--eraser); }
 #eraserBtn.on { border-color:var(--eraser); background:rgba(247,90,90,.12); color:var(--eraser); }
 #eraserIcon { font-size:15px; }
-
 #shiftList { flex:1; overflow-y:auto; padding:5px; display:flex; flex-direction:column; gap:3px; }
 #shiftList::-webkit-scrollbar { width:3px; }
 #shiftList::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 .chip { display:flex; align-items:center; gap:7px; padding:7px 9px; border-radius:7px; background:var(--bg3); border:2px solid transparent; cursor:pointer; transition:all .12s; }
-.chip:hover { border-color:rgba(255,255,255,.18); }
-.chip.on { border-color:#fff; }
+.chip:hover { border-color:rgba(128,128,128,.3); }
+.chip.on { border-color:var(--text); }
 .chip-dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
 .chip-name { font-weight:600; font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .chip-time { font-size:9px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
@@ -84,39 +114,34 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 /* ── YEAR GRID ── */
 #yearGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr)); gap:9px; }
 .mini-month { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-.mini-hdr { padding:6px 9px; font-size:11px; font-weight:600; background:var(--bg3); border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:4px; transition:background .1s; }
-.mini-hdr:hover { background:rgba(79,142,247,.1); color:var(--accent); }
+.mini-hdr { padding:6px 9px; font-size:calc(11px * var(--cell-fs)); font-weight:600; background:var(--bg3); border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:4px; transition:background .1s; }
+.mini-hdr:hover { background:var(--hover-bg); color:var(--accent); }
 .tally { display:flex; gap:3px; flex-wrap:wrap; }
-.tb { font-size:8px; padding:1px 4px; border-radius:3px; color:#fff; font-weight:600; }
+.tb { font-size:calc(8px * var(--cell-fs)); padding:1px 4px; border-radius:3px; color:#fff; font-weight:600; }
 .wk-hdr { display:grid; grid-template-columns:repeat(7,1fr); padding:3px 2px 1px; }
-.wk-hdr span { text-align:center; font-size:8px; color:var(--text2); }
+.wk-hdr span { text-align:center; font-size:calc(8px * var(--cell-fs)); color:var(--text2); }
 .day-grid { display:grid; grid-template-columns:repeat(7,1fr); padding:0 2px 3px; gap:1px; }
 
 /* ── UNIFIED DAY CELL ── */
-/* mini (year view) */
-.dc { border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position:relative; user-select:none; border:1.5px solid transparent; font-family:'JetBrains Mono',monospace; touch-action:none; transition:border-color .1s, background .1s; }
-/* mini size */
-.dc { aspect-ratio:1; font-size:9px; }
-/* big size (month view) */
+.dc { border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position:relative; user-select:none; border:1.5px solid transparent; font-family:'JetBrains Mono',monospace; touch-action:none; transition:border-color .1s,background .1s; aspect-ratio:1; font-size:calc(9px * var(--cell-fs)); }
 .dc.big { aspect-ratio:unset; min-height:58px; align-items:flex-start; justify-content:flex-start; padding:4px 5px; font-size:unset; border-radius:7px; background:var(--bg2); border-color:var(--border); }
 .dc.other { color:var(--border); pointer-events:none; }
-.dc.big.other { opacity:.25; pointer-events:none; }
-.dc.wknd:not(.other) .dc-num { color:#c4a8ff; }
+.dc.big.other { opacity:.25; pointer-events:none; background:var(--bg2); }
+.dc.wknd:not(.other) .dc-num { color:var(--wknd); }
 .dc.today { border-color:var(--today) !important; }
 .dc.today .dc-num { color:var(--today); font-weight:700; }
-.dc:not(.other):hover { border-color:rgba(255,255,255,.2); }
+.dc:not(.other):hover { border-color:rgba(128,128,128,.35); }
 .dc.sel { border-color:var(--accent) !important; box-shadow:0 0 0 1px var(--accent) inset; }
 .dc.painted { border-color:transparent !important; }
-.dc.big.painted { border-color:transparent !important; }
-.dc-num { font-size:9px; position:relative; z-index:1; }
-.dc.big .dc-num { font-size:10px; }
-.dc-shift { font-size:9px; margin-top:2px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%; color:#fff; }
-.dc-note  { font-size:8px; opacity:.72; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%; color:#fff; margin-top:1px; }
+.dc-num { font-size:calc(9px * var(--cell-fs)); position:relative; z-index:1; }
+.dc.big .dc-num { font-size:calc(10px * var(--cell-fs)); }
+.dc-shift { font-size:calc(9px * var(--cell-fs)); margin-top:2px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%; color:#fff; }
+.dc-note  { font-size:calc(8px * var(--cell-fs)); opacity:.72; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%; color:#fff; margin-top:1px; }
 
 /* big day grid */
 #bigDayGrid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
 .big-wk-hdr { display:grid; grid-template-columns:repeat(7,1fr); padding:3px 0 5px; border-bottom:1px solid var(--border); margin-bottom:5px; }
-.big-wk-hdr span { text-align:center; font-size:11px; color:var(--text2); }
+.big-wk-hdr span { text-align:center; font-size:calc(11px * var(--cell-fs)); color:var(--text2); }
 
 /* stats */
 #statsBar { display:flex; flex-wrap:wrap; gap:5px; padding:6px 9px; border-top:1px solid var(--border); background:var(--bg2); flex-shrink:0; min-height:34px; align-items:center; }
@@ -124,9 +149,9 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 .stat-dot { width:7px; height:7px; border-radius:2px; flex-shrink:0; }
 
 /* ── MODALS ── */
-.overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.62); display:none; align-items:center; justify-content:center; padding:14px; }
+.overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; padding:14px; }
 .overlay.open { display:flex; }
-.modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:100%; max-width:420px; box-shadow:0 20px 48px rgba(0,0,0,.55); overflow:hidden; }
+.modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:100%; max-width:420px; box-shadow:var(--shadow); overflow:hidden; }
 .mhdr { display:flex; align-items:center; justify-content:space-between; padding:13px 17px 10px; border-bottom:1px solid var(--border); }
 .mtitle { font-size:14px; font-weight:700; }
 .mclose { width:25px; height:25px; border-radius:5px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; }
@@ -148,15 +173,33 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 .tmpl { padding:3px 8px; border-radius:5px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); cursor:pointer; font-size:10px; font-family:inherit; }
 .tmpl:hover { border-color:var(--accent); color:var(--accent); }
 
-/* ctx menu */
-#ctx { position:fixed; z-index:300; background:var(--bg2); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 22px rgba(0,0,0,.5); padding:4px; min-width:150px; display:none; }
-.ci { padding:6px 11px; border-radius:5px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:7px; transition:background .08s; }
-.ci:hover { background:var(--bg3); }
-.ci.del { color:var(--eraser); }
-.ci.del:hover { background:rgba(247,90,90,.1); }
-.csep { height:1px; background:var(--border); margin:3px 0; }
 
-/* shift submenu inside ctx */
+/* settings panel */
+#settingsPanel {
+  position:absolute; top:48px; right:0; z-index:100;
+  background:var(--bg2); border:1px solid var(--border);
+  border-top:none; border-radius:0 0 0 10px;
+  padding:12px 14px; display:flex; flex-direction:column; gap:10px;
+  box-shadow:var(--shadow); min-width:220px;
+  transform:translateY(-8px); opacity:0; pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;
+}
+#settingsPanel.open { transform:translateY(0); opacity:1; pointer-events:auto; }
+.srow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.srow label { font-size:11px; color:var(--text2); font-weight:500; white-space:nowrap; }
+#fsSlidWrap { display:flex; align-items:center; gap:5px; }
+#fsSlidWrap span { font-size:11px; color:var(--text2); user-select:none; }
+#fsSlid { width:80px; accent-color:var(--accent); cursor:pointer; }
+#langSel { height:26px; padding:0 5px; border-radius:5px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; font-size:11px; font-family:inherit; outline:none; }
+#langSel:hover { border-color:var(--accent); }
+
+/* ctx menu */
+#ctx { position:fixed; z-index:300; background:var(--bg2); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); padding:4px; min-width:150px; display:none; }
+.ci { padding:6px 11px; border-radius:5px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:7px; transition:background .08s; }
+.ci:hover { background:var(--hover-bg); }
+.ci.del { color:var(--eraser); }
+.ci.del:hover { background:rgba(200,50,50,.1); }
+.csep { height:1px; background:var(--border); margin:3px 0; }
 #ctxShifts { max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:1px; }
 #ctxShifts::-webkit-scrollbar { width:3px; }
 #ctxShifts::-webkit-scrollbar-thumb { background:var(--border); }
@@ -180,49 +223,74 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 
 <div id="topBar">
   <div class="nav-g">
-    <button class="ibtn" id="togglePal" title="班次面板">🎨</button>
-    <h1>班 表</h1>
+    <button class="ibtn" id="togglePal">🎨</button>
+    <h1 id="appTitle" data-i18n="appTitle">班表</h1>
   </div>
   <div class="nav-g" style="flex:1;justify-content:center;">
     <button class="ibtn" id="prevYear">‹‹</button>
     <span id="yearLabel">2025</span>
     <button class="ibtn" id="nextYear">››</button>
   </div>
-  <div class="nav-g">
-    <button class="tbtn" id="expJsonBtn">⬇ <span>JSON</span></button>
-    <button class="tbtn" id="impJsonBtn">⬆ <span>JSON</span></button>
-    <button class="tbtn" id="expIcsBtn">📅 <span>ICS</span></button>
+  <div class="nav-g" style="position:relative;">
+    <button class="tbtn" id="expJsonBtn">↓ JSON</button>
+    <button class="tbtn" id="impJsonBtn">↑ JSON</button>
+    <button class="tbtn" id="expIcsBtn">↓ ICS</button>
+    <button class="tbtn" id="impIcsBtn">↑ ICS</button>
     <input type="file" id="impJsonFile" accept=".json" style="display:none">
     <input type="file" id="impIcsFile"  accept=".ics"  style="display:none">
+    <button class="ibtn" id="settingsBtn" title="Settings">⚙️</button>
+    <div id="settingsPanel">
+      <div class="srow">
+        <label data-i18n="settingsTheme">主题</label>
+        <button class="ibtn" id="themeBtn" style="width:auto;padding:0 8px;font-size:12px;">🌙 <span id="themeBtnLabel"></span></button>
+      </div>
+      <div class="srow">
+        <label data-i18n="settingsLang">语言</label>
+        <select id="langSel">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="it">Italiano</option>
+          <option value="ru">Русский</option>
+          <option value="th">ภาษาไทย</option>
+        </select>
+      </div>
+      <div class="srow">
+        <label data-i18n="settingsFont">字体大小</label>
+        <div id="fsSlidWrap">
+          <span>A</span>
+          <input type="range" id="fsSlid" min="0.7" max="2" step="0.05" value="1">
+          <span style="font-size:15px">A</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
 <div id="main">
-  <!-- PALETTE -->
   <div id="palette">
-    <div id="palHdr">
-      <span>班次颜料盘</span>
-    </div>
-    <!-- Eraser tool -->
-    <button id="eraserBtn"><span id="eraserIcon">◻</span> 橡皮擦（清除班次）</button>
+    <div id="palHdr" data-i18n="palette"></div>
+    <button id="eraserBtn"><span id="eraserIcon">◻</span> <span data-i18n="eraser"></span></button>
     <div id="shiftList"></div>
-    <button id="addChipBtn">＋ 添加班次类型</button>
+    <button id="addChipBtn" data-i18n="addShift"></button>
   </div>
 
-  <!-- CALENDAR -->
   <div id="calArea">
     <div id="monthNav">
       <button class="ibtn" id="prevBtn">‹</button>
-      <span id="monthLabel">全年</span>
+      <span id="monthLabel"></span>
       <div id="monthBtns"></div>
       <button class="ibtn" id="nextBtn">›</button>
     </div>
     <div id="selBar">
-      <span>已选 <span id="selCount">0</span> 天</span>
-      <button class="sbbtn" id="applyBtn">应用班次</button>
-      <button class="sbbtn del" id="clearSelBtn">清除班次</button>
-      <button class="sbbtn" id="noteBtn">添加备注</button>
-      <button class="sbbtn" id="deselBtn">取消全选</button>
+      <span data-i18n="selected"></span> <span id="selCount">0</span> <span data-i18n="days"></span>
+      <button class="sbbtn" id="applyBtn" data-i18n="applyShift"></button>
+      <button class="sbbtn del" id="clearSelBtn" data-i18n="clearShift"></button>
+      <button class="sbbtn" id="noteBtn" data-i18n="addNote"></button>
+      <button class="sbbtn" id="deselBtn" data-i18n="deselect"></button>
     </div>
     <div id="calScroll">
       <div id="yearGrid"></div>
@@ -238,23 +306,23 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 <!-- SHIFT MODAL -->
 <div class="overlay" id="shiftModal">
   <div class="modal">
-    <div class="mhdr"><span class="mtitle" id="smTitle">添加班次</span><button class="mclose" id="smClose">✕</button></div>
+    <div class="mhdr"><span class="mtitle" id="smTitle"></span><button class="mclose" id="smClose">✕</button></div>
     <div class="mbody">
       <div id="tmplList"></div>
-      <div class="frow"><label>班次名称</label><input class="finput" id="fName" placeholder="如：早班、夜班、休息…"></div>
+      <div class="frow"><label data-i18n="shiftName"></label><input class="finput" id="fName"></div>
       <div class="frow-h">
-        <div class="frow"><label>开始时间</label><input class="finput" id="fStart" type="time" value="08:00"></div>
-        <div class="frow"><label>结束时间</label><input class="finput" id="fEnd"   type="time" value="16:00"></div>
+        <div class="frow"><label data-i18n="startTime"></label><input class="finput" id="fStart" type="time" value="08:00"></div>
+        <div class="frow"><label data-i18n="endTime"></label><input class="finput" id="fEnd" type="time" value="16:00"></div>
       </div>
       <div class="frow-h">
-        <div class="frow"><label>提醒（分钟前）</label><input class="finput" id="fAlarm" type="number" value="30" min="0"></div>
-        <div class="frow"><label>颜色</label><input class="finput" id="fColor" type="color" value="#4f8ef7" style="height:36px;padding:3px;cursor:pointer;"></div>
+        <div class="frow"><label data-i18n="alarmMin"></label><input class="finput" id="fAlarm" type="number" value="30" min="0"></div>
+        <div class="frow"><label data-i18n="color"></label><input class="finput" id="fColor" type="color" value="#4f8ef7" style="height:36px;padding:3px;cursor:pointer;"></div>
       </div>
-      <div class="frow"><label>备注</label><input class="finput" id="fDesc" placeholder="可选"></div>
+      <div class="frow"><label data-i18n="desc"></label><input class="finput" id="fDesc"></div>
     </div>
     <div class="mfoot">
-      <button class="mbtn sec" id="smCancel">取消</button>
-      <button class="mbtn pri" id="smSave">保存</button>
+      <button class="mbtn sec" id="smCancel" data-i18n="cancel"></button>
+      <button class="mbtn pri" id="smSave" data-i18n="save"></button>
     </div>
   </div>
 </div>
@@ -262,25 +330,25 @@ body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--
 <!-- NOTE MODAL -->
 <div class="overlay" id="noteModal">
   <div class="modal" style="max-width:330px">
-    <div class="mhdr"><span class="mtitle">添加备注</span><button class="mclose" id="nmClose">✕</button></div>
+    <div class="mhdr"><span class="mtitle" data-i18n="noteTitle"></span><button class="mclose" id="nmClose">✕</button></div>
     <div class="mbody">
-      <div class="frow"><label>备注（多行对应多天）</label><textarea class="finput" id="noteText" rows="4" style="resize:vertical" placeholder="每行对应一个选中日期"></textarea></div>
+      <div class="frow"><label data-i18n="noteLabel"></label><textarea class="finput" id="noteText" rows="4" style="resize:vertical"></textarea></div>
     </div>
     <div class="mfoot">
-      <button class="mbtn sec" id="nmCancel">取消</button>
-      <button class="mbtn pri" id="nmSave">保存</button>
+      <button class="mbtn sec" id="nmCancel" data-i18n="cancel"></button>
+      <button class="mbtn pri" id="nmSave" data-i18n="save"></button>
     </div>
   </div>
 </div>
 
 <!-- CONTEXT MENU -->
 <div id="ctx">
-  <div class="ci" id="ctxSwitch">🔁 改涂为…</div>
+  <div class="ci" id="ctxSwitch"><span>🔁</span> <span data-i18n="ctxSwitch"></span></div>
   <div id="ctxShifts"></div>
   <div class="csep"></div>
-  <div class="ci" id="ctxNote">📝 添加备注</div>
+  <div class="ci" id="ctxNote"><span>📝</span> <span data-i18n="ctxNote"></span></div>
   <div class="csep"></div>
-  <div class="ci del" id="ctxDel">✕ 清除班次</div>
+  <div class="ci del" id="ctxDel"><span>✕</span> <span data-i18n="ctxDel"></span></div>
 </div>
 
 <script src="script.js"></script>
